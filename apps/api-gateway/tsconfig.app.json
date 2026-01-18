@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "types": ["node", "express"],
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
+    "rootDir": "../../"
+  },
+  "include": ["src/**/*.ts", "../../libs/**/*.ts"],
+  "exclude": []
+}

@@ -4,10 +4,7 @@
   "files": [],
   "references": [
     {
-      "path": "./apps/aegis-e2e"
-    },
-    {
-      "path": "./apps/aegis"
+      "path": "./apps/api-gateway"
     }
   ]
 }

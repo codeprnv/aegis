@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "composite": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
@@ -16,6 +17,9 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@aegis/source"]
+    "customConditions": ["@aegis/source"],
+    "paths": {
+      "@aegis/common": ["libs/index.ts"]
+    }
   }
 }
