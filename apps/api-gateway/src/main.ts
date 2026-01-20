@@ -1,5 +1,6 @@
 import { apiGatewayEnvSchema } from '@aegis/common';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 
 dotenv.config({
   path: '../../../.env',
@@ -15,6 +16,7 @@ import {
   extractAuthContext,
   logger,
   requestTracer,
+  sanitizeHeaders,
 } from '@aegis/common';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -22,11 +24,37 @@ import express from 'express';
 import 'express-async-errors';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
-const { HOST: host, API_GATEWAY_PORT: port, ORIGIN_HOST_1: origin } = env;
+const {
+  HOST: host,
+  API_GATEWAY_PORT: port,
+  ORIGIN_HOST_1: origin,
+  NODE_ENV: nodeEnv,
+} = env;
 const app = express();
 
 app.use(requestTracer);
+app.use(sanitizeHeaders);
 app.use(accessLogger);
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        objectSrc: ["'none'"], // No Flash/Java
+        upgradeInsecureRequests: [],
+      },
+    },
+    hsts: {
+      maxAge: 63072000, // 2 Years
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameguard: {
+      action: 'deny', // Prevent Clickjacking
+    },
+  })
+);
 
 app.use(
   cors({
