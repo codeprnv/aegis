@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { ForbiddenError, UnauthorizedError } from '../error';
+import { ForbiddenError, UnauthorizedError } from '../error/index.js';
 
 export const requireRole = (role: 'user' | 'admin') => {
   return (req: Request, _res: Response, next: NextFunction) => {

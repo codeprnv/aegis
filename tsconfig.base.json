@@ -19,7 +19,7 @@
     "target": "es2022",
     "customConditions": ["@aegis/source"],
     "paths": {
-      "@aegis/common": ["libs/index.ts"]
+      "@aegis/common": ["packages/index.ts"]
     }
   }
 }

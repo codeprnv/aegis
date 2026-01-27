@@ -11,7 +11,7 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@aegis/common': resolve(__dirname, '../../libs'),
+      '@aegis/common': resolve(__dirname, '../../packages'),
     },
     extensions: ['.ts', '.js'],
   },

@@ -8,6 +8,7 @@ export default {
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/api-gateway',
   moduleNameMapper: {
-    '^@aegis/common$': '<rootDir>/../../libs/index.ts',
+    '^@aegis/common$': '<rootDir>/../../packages/index.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

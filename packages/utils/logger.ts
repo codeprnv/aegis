@@ -5,7 +5,10 @@ export const logger = pino({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   mixin: () => {
     const correlationId = id();
-    return correlationId ? { correlationId } : {};
+    return {
+      correlationId: correlationId || undefined,
+      service: process.env.SERVICE_NAME || 'unknown',
+    };
   },
   transport:
     process.env.NODE_ENV !== 'production'

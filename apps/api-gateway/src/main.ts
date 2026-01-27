@@ -1,4 +1,7 @@
+process.env.SERVICE_NAME = 'api-gateway';
+
 import { apiGatewayEnvSchema } from '@aegis/common';
+import { id } from 'cls-rtracer';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 
@@ -14,6 +17,7 @@ import {
   accessLogger,
   errorMiddleware,
   extractAuthContext,
+  generateInternalToken,
   logger,
   requestTracer,
   sanitizeHeaders,
@@ -22,6 +26,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import 'express-async-errors';
+import proxy from 'express-http-proxy';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 const {
@@ -90,6 +95,30 @@ app.use(rateLimiter);
 app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to api-gateway!' });
 });
+
+// Proxy to Profile Service (Placeholder URL)
+const PROFILE_SERVICE_URL =
+  process.env.PROFILE_SERVICE_URL || 'http://localhost:3001';
+
+app.use(
+  '/users',
+  proxy(PROFILE_SERVICE_URL, {
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers['X-Correlation-Id'] = String(id() ?? '');
+      const payload = {
+        sub: srcReq.auth?.id || 'anonymous',
+        role: srcReq.auth?.role || 'guest',
+      };
+
+      const internalToken = generateInternalToken(payload);
+
+      if (proxyReqOpts.headers) {
+        proxyReqOpts.headers['Authorization'] = `Bearer ${internalToken}`;
+      }
+      return proxyReqOpts;
+    },
+  })
+);
 
 app.use(errorMiddleware);
 

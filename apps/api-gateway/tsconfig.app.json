@@ -6,6 +6,6 @@
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "rootDir": "../../"
   },
-  "include": ["src/**/*.ts", "../../libs/**/*.ts"],
+  "include": ["src/**/*.ts", "../../packages/**/*.ts"],
   "exclude": []
 }
