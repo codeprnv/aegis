@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { logger } from '../../utils/logger';
-import { AppError } from './index';
+import { logger } from '../../utils/logger.js';
+import { AppError } from './index.js';
 
 export const errorMiddleware = (
   err: Error,
@@ -11,7 +11,7 @@ export const errorMiddleware = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ) => {
-  let error = err;
+  const error = err;
 
   // Log the error
   logger.error(
@@ -35,14 +35,16 @@ export const errorMiddleware = (
       process.env.NODE_ENV === 'production' &&
       statusCode === StatusCodes.INTERNAL_SERVER_ERROR
     ) {
-      error = new AppError(
+      const maskedError = new AppError(
         'Something went wrong',
         StatusCodes.INTERNAL_SERVER_ERROR,
         false
       );
-    } else {
-      // In dev or if it has a status code, treat it as is but wrap in AppError structure for consistency if needed,
-      // or just return the JSON directly.
+      return res.status(maskedError.statusCode).json({
+        status: 'error',
+        statusCode: maskedError.statusCode,
+        message: maskedError.message,
+      });
     }
   }
 

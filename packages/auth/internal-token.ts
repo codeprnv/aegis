@@ -1,8 +1,6 @@
 import * as jwt from 'jsonwebtoken';
 
-const INTERNAL_JWT_SECRET =
-  process.env.INTERNAL_JWT_SECRET ||
-  'fallback-internal-secret-do-not-use-in-prod';
+const INTERNAL_JWT_SECRET = process.env.INTERNAL_JWT_SECRET as string;
 
 export interface InternalTokenPayload {
   sub: string; // User ID

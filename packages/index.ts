@@ -10,4 +10,5 @@ export * from './middlewares/logs/request-tracer.js';
 export * from './middlewares/sanitizeHeaders.js';
 export * from './types/env.js';
 export * from './utils/logger.js';
+export * from './gateway/createServiceProxy.js';
 
