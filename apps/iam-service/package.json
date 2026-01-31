@@ -1,5 +1,5 @@
 {
-  "name": "@aegis/auth-service",
+  "name": "@aegis/iam-service",
   "version": "0.0.1",
   "private": true,
   "nx": {
@@ -11,8 +11,8 @@
         "cache": true,
         "executor": "@nx/js:prune-lockfile",
         "outputs": [
-          "{workspaceRoot}/apps/auth-service/dist/package.json",
-          "{workspaceRoot}/apps/auth-service/dist/package-lock.json"
+          "{workspaceRoot}/apps/iam-service/dist/package.json",
+          "{workspaceRoot}/apps/iam-service/dist/package-lock.json"
         ],
         "options": {
           "buildTarget": "build"
@@ -24,7 +24,7 @@
         ],
         "cache": true,
         "outputs": [
-          "{workspaceRoot}/apps/auth-service/dist/workspace_modules"
+          "{workspaceRoot}/apps/iam-service/dist/workspace_modules"
         ],
         "executor": "@nx/js:copy-workspace-modules",
         "options": {
@@ -46,15 +46,15 @@
           "build"
         ],
         "options": {
-          "buildTarget": "@aegis/auth-service:build",
+          "buildTarget": "@aegis/iam-service:build",
           "runBuildTargetDependencies": false
         },
         "configurations": {
           "development": {
-            "buildTarget": "@aegis/auth-service:build:development"
+            "buildTarget": "@aegis/iam-service:build:development"
           },
           "production": {
-            "buildTarget": "@aegis/auth-service:build:production"
+            "buildTarget": "@aegis/iam-service:build:production"
           }
         }
       },

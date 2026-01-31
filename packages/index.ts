@@ -1,5 +1,8 @@
 export * from './auth/internal-token.js';
+export * from './auth/token-service.js';
+export * from './gateway/createServiceProxy.js';
 export * from './middlewares/auth/extractAuthContext.js';
+export * from './middlewares/auth/requireAccessToken.js';
 export * from './middlewares/auth/requireAuth.js';
 export * from './middlewares/auth/requireInternalToken.js';
 export * from './middlewares/auth/requireRole.js';
@@ -8,7 +11,6 @@ export * from './middlewares/error/index.js';
 export * from './middlewares/logs/access-logger.js';
 export * from './middlewares/logs/request-tracer.js';
 export * from './middlewares/sanitizeHeaders.js';
-export * from './types/env.js';
 export * from './utils/logger.js';
-export * from './gateway/createServiceProxy.js';
+export * from './utils/password.js';
 

@@ -1,6 +1,6 @@
 process.env.SERVICE_NAME = 'api-gateway';
 
-import { apiGatewayEnvSchema } from '@aegis/common';
+import { apiGatewayEnvSchema } from '@aegis/types';
 import { id } from 'cls-rtracer';
 import dotenv from 'dotenv';
 import helmet from 'helmet';

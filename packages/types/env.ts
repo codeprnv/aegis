@@ -6,10 +6,10 @@ export const apiGatewayEnvSchema = z.object({
   ORIGIN_HOST_1: z.coerce.string<string>().default('http://localhost:3000'),
   JWT_SECRET: z.coerce
     .string<string>()
-    .min(5, 'JWT_SECRET is required with min length 5'),
+    .min(32, 'JWT_SECRET is required with min length 32'),
   INTERNAL_JWT_SECRET: z.coerce
     .string<string>()
-    .min(5, 'INTERNAL_JWT_SECRET is required with min length 5'),
+    .min(32, 'INTERNAL_JWT_SECRET is required with min length 32'),
   PROFILE_SERVICE_URL: z.coerce
     .string<string>()
     .default('http://localhost:3001'),
@@ -18,6 +18,22 @@ export const apiGatewayEnvSchema = z.object({
     .default('development'),
 });
 
-export type ApiGatewayEnv = z.infer<typeof apiGatewayEnvSchema>;
+export const iamServiceEnvSchema = z.object({
+  AUTH_SERVICE_PORT: z.coerce.number<number>().default(6000),
+  HOST: z.coerce.string<string>().default('http://localhost'),
+  NODE_ENV: z
+    .enum(['development', 'production', 'test'])
+    .default('development'),
+  JWT_SECRET: z.coerce
+    .string<string>()
+    .min(32, 'JWT_SECRET is required with min length 32'),
+  INTERNAL_JWT_SECRET: z.coerce
+    .string<string>()
+    .min(32, 'INTERNAL_JWT_SECRET is required with min length 32'),
+  DATABASE_URL: z.coerce.string<string>(),
+});
 
-export default apiGatewayEnvSchema;
+export type ApiGatewayEnv = z.infer<typeof apiGatewayEnvSchema>;
+export type IamServiceEnv = z.infer<typeof iamServiceEnvSchema>;
+
+export default { apiGatewayEnvSchema, iamServiceEnvSchema };

@@ -17,9 +17,12 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
+    "esModuleInterop": true,
     "customConditions": ["@aegis/source"],
     "paths": {
-      "@aegis/common": ["packages/index.ts"]
+      "@aegis/common": ["packages/index.ts"],
+      "@aegis/types": ["packages/types/index.ts"],
+      "@aegis/database": ["packages/database/client.ts"]
     }
   }
 }
