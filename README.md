@@ -24,7 +24,13 @@ The project follows a modular **Nx Monorepo** structure, separating concerns bet
   - **🔑 Context**: Authentication context extraction from tokens.
   - **Health Checks**: `/gateway-health` endpoint.
 
-### 📚 Libraries (`libs/`)
+- **`apps/iam-service`**
+  The identity and access management service. It handles:
+  - **🔐 Authentication**: User registration, login, and secure password hashing (Argon2).
+  - **🎫 Token Management**: JWT issuance (Access & Refresh tokens).
+  - **👤 User Management**: Profile management and RBAC.
+
+### 📚 Packages (`packages/`)
 
 Core utilities shared across the platform:
 
@@ -46,6 +52,7 @@ Core utilities shared across the platform:
 - **Validation**: [Zod](https://zod.dev/)
 - **Logging**: [Pino](https://github.com/pinojs/pino)
 - **Utilities**: `dotenv`, `cors`, `cookie-parser`, `express-limit`.
+- **Security**: `argon2` (Password Hashing).
 
 ---
 
@@ -90,11 +97,12 @@ npx nx serve api-gateway
 
 ## 🧪 Commands
 
-| Command                    | Description                                             |
-| :------------------------- | :------------------------------------------------------ |
-| `npm run dev`              | Starts the development server for the entire workspace. |
-| `npx nx build api-gateway` | Builds the API Gateway for production.                  |
-| `npx nx graph`             | Visualizes the project dependency graph.                |
+| Command                     | Description                                             |
+| :-------------------------- | :------------------------------------------------------ |
+| `npm run dev`               | Starts the development server for the entire workspace. |
+| `npx nx build api-gateway`  | Builds the API Gateway for production.                  |
+| `npx jest apps/iam-service` | Runs unit tests for the IAM service.                    |
+| `npx nx graph`              | Visualizes the project dependency graph.                |
 
 ---
 
