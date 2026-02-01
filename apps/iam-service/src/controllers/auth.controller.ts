@@ -112,3 +112,44 @@ export const loginUserController = async (
     next(error);
   }
 };
+
+/*
+ * POST /refresh
+ * Refresh access token using refresh token cookie
+ */
+export const refreshTokenController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const refreshToken = req.cookies['refresh_token'];
+
+    if (!refreshToken) {
+      throw new BadRequestError('Refresh token required');
+    }
+
+    const user = await authService.refreshTokenService(refreshToken);
+
+    res.cookie('access_token', user.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refresh_token', user.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Token refreshed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};

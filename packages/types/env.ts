@@ -16,10 +16,11 @@ export const apiGatewayEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  IAM_SERVICE_PORT: z.coerce.number<number>().default(6000),
 });
 
 export const iamServiceEnvSchema = z.object({
-  AUTH_SERVICE_PORT: z.coerce.number<number>().default(6000),
+  IAM_SERVICE_PORT: z.coerce.number<number>().default(6000),
   HOST: z.coerce.string<string>().default('http://localhost'),
   NODE_ENV: z
     .enum(['development', 'production', 'test'])

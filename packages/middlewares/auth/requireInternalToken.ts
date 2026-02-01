@@ -23,6 +23,7 @@ export const requireInternalToken = (serviceName: string) => {
       req.log = logger.child({ userId: req.user?.sub });
       next();
     } catch (error) {
+      logger.error({ error }, 'Internal token validation failed');
       return next(error);
     }
   };

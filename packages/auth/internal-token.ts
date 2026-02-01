@@ -1,6 +1,14 @@
 import * as jwt from 'jsonwebtoken';
 
-const INTERNAL_JWT_SECRET = process.env.INTERNAL_JWT_SECRET as string;
+const getSecret = () => {
+  const secret = process.env.INTERNAL_JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      'INTERNAL_JWT_SECRET is not defined in environment variables'
+    );
+  }
+  return secret;
+};
 
 export interface InternalTokenPayload {
   sub: string; // User ID
@@ -15,7 +23,7 @@ export const generateInternalToken = (
   payload: Omit<InternalTokenPayload, 'aud'>,
   audience = 'internal-service'
 ): string => {
-  return jwt.sign(payload, INTERNAL_JWT_SECRET, {
+  return jwt.sign(payload, getSecret(), {
     expiresIn: '1m', //short-lived
     audience,
     issuer: 'aegis-gateway',
@@ -30,7 +38,7 @@ export const verifyInternalToken = (
   expectedAudience: string
 ): InternalTokenPayload => {
   try {
-    const decoded = jwt.verify(token, INTERNAL_JWT_SECRET, {
+    const decoded = jwt.verify(token, getSecret(), {
       issuer: 'aegis-gateway',
       audience: expectedAudience,
       algorithms: ['HS256'],

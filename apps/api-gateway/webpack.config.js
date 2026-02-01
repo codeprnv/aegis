@@ -13,6 +13,10 @@ module.exports = {
     alias: {
       '@aegis/common': resolve(__dirname, '../../packages'),
       '@aegis/types': resolve(__dirname, '../../packages/types'),
+      '@aegis/database': resolve(
+        __dirname,
+        '../../packages/database/client.ts'
+      ),
     },
     extensions: ['.ts', '.js'],
   },

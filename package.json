@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "nx run-many --target=build --all",
-    "dev": "nx run-many --target=serve --all --watch",
+    "dev": "nx run-many --target=serve --all --watch --skip-nx-cache",
     "test": "npx jest"
   },
   "private": true,

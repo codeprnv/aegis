@@ -9,7 +9,6 @@ export const sanitizeHeaders = (
     'x-user-id',
     'x-user-role',
     'x-correlation-id',
-    'authorization',
   ];
 
   SENSITIVE_HEADERS.forEach((header) => {

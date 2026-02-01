@@ -4,8 +4,10 @@ import { logger } from '@aegis/common';
 import { iamServiceEnvSchema } from '@aegis/types';
 import dotenv from 'dotenv';
 
+import path from 'path';
+
 dotenv.config({
-  path: '../../../.env',
+  path: path.resolve(process.cwd(), '.env'),
 });
 const env = iamServiceEnvSchema.parse(process.env);
 Object.freeze(env);
@@ -22,7 +24,7 @@ import express from 'express';
 import 'express-async-errors';
 import authRoutes from './routes/auth.route';
 
-const port = env.AUTH_SERVICE_PORT;
+const port = env.IAM_SERVICE_PORT;
 const host = env.HOST;
 const app = express();
 

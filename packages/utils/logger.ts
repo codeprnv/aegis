@@ -6,7 +6,8 @@ export const logger = pino({
   mixin: () => {
     const correlationId = id();
     return {
-      correlationId: correlationId || undefined,
+      correlationId:
+        typeof correlationId === 'string' ? correlationId : undefined,
       service: process.env.SERVICE_NAME || 'unknown',
     };
   },

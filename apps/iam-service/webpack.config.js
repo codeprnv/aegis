@@ -9,6 +9,7 @@ module.exports = {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
     }),
   },
+  externals: ['argon2'],
   resolve: {
     alias: {
       '@aegis/common': resolve(__dirname, '../../packages/index.ts'),
