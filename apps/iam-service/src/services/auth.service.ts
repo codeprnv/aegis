@@ -14,9 +14,9 @@ import { AuthResponse, RegisterUserInput } from '../types/registrationTypes';
 /**
  * Register a new user
  */
-export async function registerUser(
+export const registerUser = async (
   input: RegisterUserInput
-): Promise<AuthResponse> {
+): Promise<AuthResponse> => {
   const { username, email, password, mobile } = input;
 
   // Check if user already exists
@@ -55,7 +55,7 @@ export async function registerUser(
   });
 
   return user;
-}
+};
 
 export const loginUser = async (
   input: LoginUserInput

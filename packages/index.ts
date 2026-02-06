@@ -1,4 +1,5 @@
 export * from './auth/internal-token.js';
+export * from './auth/set-cookie.js';
 export * from './auth/token-service.js';
 export * from './gateway/createServiceProxy.js';
 export * from './middlewares/auth/extractAuthContext.js';
@@ -11,6 +12,7 @@ export * from './middlewares/error/index.js';
 export * from './middlewares/logs/access-logger.js';
 export * from './middlewares/logs/request-tracer.js';
 export * from './middlewares/sanitizeHeaders.js';
+export * from './utils/constants.js';
 export * from './utils/logger.js';
 export * from './utils/password.js';
 

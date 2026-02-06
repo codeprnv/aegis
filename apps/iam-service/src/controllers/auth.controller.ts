@@ -1,4 +1,9 @@
-import { BadRequestError } from '@aegis/common';
+import {
+  BadRequestError,
+  EMAIL_REGEX,
+  setCookie,
+  validatePassword,
+} from '@aegis/common';
 import type { NextFunction, Request, Response } from 'express';
 import * as authService from '../services/auth.service';
 
@@ -14,7 +19,7 @@ export const registerUserController = async (
   try {
     const { username, email, password, mobile } = req.body;
 
-    // Input validation (controller's responsibility)
+    // Input validation
     if (!username || !email || !password) {
       throw new BadRequestError(
         'Missing required fields: username, email, and password are required'
@@ -25,13 +30,17 @@ export const registerUserController = async (
       throw new BadRequestError('Username must be at least 3 characters');
     }
 
-    if (typeof password !== 'string' || password.length < 8) {
-      throw new BadRequestError('Password must be at least 8 characters');
+    if (typeof password !== 'string') {
+      throw new BadRequestError('Password must be a string');
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.success) {
+      throw new BadRequestError(passwordValidation.error || 'Invalid password');
     }
 
     // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!EMAIL_REGEX.test(email)) {
       throw new BadRequestError('Invalid email format');
     }
 
@@ -72,8 +81,7 @@ export const loginUserController = async (
       throw new BadRequestError('Email and password are required!');
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!EMAIL_REGEX.test(email)) {
       throw new BadRequestError('Invalid email format');
     }
 
@@ -82,17 +90,8 @@ export const loginUserController = async (
       password,
     });
 
-    res.cookie('access_token', user.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000,
-    });
-
-    res.cookie('refresh_token', user.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    setCookie('access_token', user.accessToken || '', res);
+    setCookie('refresh_token', user.refreshToken || '', res, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -131,17 +130,8 @@ export const refreshTokenController = async (
 
     const user = await authService.refreshTokenService(refreshToken);
 
-    res.cookie('access_token', user.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 15 * 60 * 1000,
-    });
-
-    res.cookie('refresh_token', user.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+    setCookie('access_token', user.accessToken || '', res);
+    setCookie('refresh_token', user.refreshToken || '', res, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

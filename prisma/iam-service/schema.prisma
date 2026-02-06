@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  GITHUB
+}
+
+enum AuthMethod {
+  PASSWORD
+  MFA
+  BIOMETRICS
+  PASSKEYS
+}
+
+// ------- User Management -------
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  username     String  @unique
+  mobile       String? @unique
+  passwordHash String? @map("password_hash")
+
+  // Role based access control (RBAC)
+  role UserRole @default(USER)
+
+  // Oauth providers
+  authProvider AuthProvider @default(LOCAL) @map("auth_provider")
+  googleId     String?      @unique @map("google_id")
+  githubId     String?      @unique @map("github_id")
+
+  // Account Security
+  accountLocked       Boolean   @default(false) @map("account_locked")
+  accountLockedAt     DateTime? @map("account_locked_at")
+  accountLockedReason String?   @map("account_locked_reason")
+  lockedUntil         DateTime? @map("locked_until")
+
+  // Activity Tracking
+  lastLoginAt         DateTime? @map("last_login_at")
+  lastActiveAt        DateTime  @default(now()) @map("last_active_at")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lastFailedLoginAt   DateTime? @map("last_failed_login_at")
+
+  // Email Verification
+  emailVerified                   Boolean   @default(false) @map("email_verified")
+  emailVerifiedAt                 DateTime? @map("email_verified_at")
+  emailVerificationToken          String?   @map("email_verification_token")
+  emailVerificationTokenExpiresAt DateTime? @map("email_verification_token_expires_at")
+
+  // Relations
+  sessions        Session[]
+  passwordHistory PasswordHistory[]
+  passwordResets  PasswordReset[]
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy String?   @map("deleted_by")
+
+  @@index([email])
+  @@index([accountLocked])
+  @@index([lockedUntil])
+  @@index([deletedAt])
+  @@index([authProvider, googleId])
+  @@index([authProvider, githubId])
+  @@index([emailVerified, deletedAt])
+  @@map("users")
+}
+
+// ------- Password Management -------
+model PasswordHistory {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  passwordHash String   @map("password_hash")
+  changedAt    DateTime @default(now()) @map("changed_at")
+
+  @@index([userId])
+  @@index([userId, changedAt]) //Recent password change lookups
+  @@map("password_history")
+}
+
+model PasswordReset {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash      String   @unique @map("token_hash")
+  tokenExpiresAt DateTime @map("token_expires_at")
+
+  // OTP
+  otpHash      String    @map("otp_hash")
+  otpExpiresAt DateTime  @map("otp_expires_at")
+  otpAttempts  Int       @default(0) @map("otp_attempts")
+  otpUsed      Boolean   @default(false)
+  otpUsedAt    DateTime? @map("otp_used_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tokenHash])
+  @@index([userId])
+  @@index([tokenExpiresAt])
+  @@index([userId, otpUsed]) //Unused resets per user
+  @@map("password_resets")
+}
+
+// -------- Session Management ----------
+model Session {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Hashed refresh token
+  refreshTokenHash String  @map("refresh_token_hash")
+  tokenFamily      String  @default(uuid()) @map("token_family")
+  rotationCount    Int     @default(0) @map("rotation_count")
+  isCompromised    Boolean @default(false) @map("is_compromised")
+
+  // Session metadata
+  userAgent         String? @map("user_agent")
+  ipAddress         String? @map("ip_address")
+  deviceFingerprint String? @map("device_fingerprint")
+  deviceType        String? @map("device_type")
+  deviceName        String? @map("device_name")
+  osName            String? @map("os_name")
+  osVersion         String? @map("os_version")
+  browserName       String? @map("browser_name")
+  browserVersion    String? @map("browser_version")
+
+  // Location
+  city      String?
+  state     String?
+  country   String?
+  latitude  Float?
+  longitude Float?
+
+  // Session Lifecycle
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
+  lastUsedAt    DateTime  @map("last_used_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([refreshTokenHash])
+  @@index([userId, expiresAt]) // Active sessions per user
+  @@index([userId, revokedAt]) // Non-revoked sessions
+  @@index([tokenFamily, isCompromised])
+  @@map("sessions")
+}
+
+// -------- System Configuration -----------
+model AuthConfig {
+  id String @id @default(uuid())
+
+  methodName AuthMethod @unique @map("method_name")
+  isEnabled  Boolean    @default(true) @map("is_enabled")
+  isRequired Boolean    @default(false) @map("is_required")
+  priority   Int?
+
+  // Security Settings
+  maxFailedAttempts Int?    @map("max_failed_attempts")
+  lockoutDuration   Int?    @map("lockout_duration") // in minutes
+  requireMfa        Boolean @default(false) @map("require_mfa")
+
+  // Rate Limiting
+  rateLimitWindow   Int? @map("rate_limit_window") // in seconds
+  rateLimitRequests Int? @map("rate_limit_requests")
+
+  // Session Settings
+  sessionDuration       Int? @map("session_duration") // in minutes
+  sessionIdleTimeout    Int? @map("session_idle_timeout") // in minutes
+  maxConcurrentSessions Int? @map("max_concurrent_sessions")
+
+  // Password Settings
+  passwordPolicy     String? @map("password_policy")
+  passwordExpiryDays Int?    @map("password_expiry_days")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([methodName])
+  @@map("auth_configs")
+}
