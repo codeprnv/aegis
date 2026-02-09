@@ -33,4 +33,14 @@ module.exports = {
       sourceMap: true,
     }),
   ],
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        enforce: 'pre',
+        loader: 'source-map-loader',
+        exclude: [/generated[\\/]prisma/],
+      },
+    ],
+  },
 };

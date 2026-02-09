@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
+import { ZodError } from 'zod';
 import { logger } from '../../utils/logger.js';
 import { AppError } from './index.js';
 
@@ -12,6 +13,19 @@ export const errorMiddleware = (
   next: NextFunction
 ) => {
   const error = err;
+
+  // Handle Zod validation errors
+  if (error instanceof ZodError) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      status: 'error',
+      statusCode: StatusCodes.BAD_REQUEST,
+      message: 'Validation failed',
+      errors: error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
+  }
 
   // Log the error
   logger.error(

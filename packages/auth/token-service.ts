@@ -1,11 +1,13 @@
 import jwt from 'jsonwebtoken';
 import { BadRequestError } from '../middlewares/error/index.js';
 
+import { AUTH_CONFIG } from '../utils/common-config.js';
+
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET as string;
-const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY = AUTH_CONFIG.ACCESS_TOKEN_EXPIRY;
 
 const REFRESH_TOKEN_SECRET = process.env.JWT_SECRET as string;
-const REFRESH_TOKEN_EXPIRY = '7d';
+const REFRESH_TOKEN_EXPIRY = AUTH_CONFIG.REFRESH_TOKEN_EXPIRY;
 
 export interface TokenPayload {
   sub: string; // User ID

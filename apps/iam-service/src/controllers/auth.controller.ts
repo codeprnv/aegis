@@ -1,11 +1,17 @@
 import {
+  AUTH_CONFIG,
   BadRequestError,
-  EMAIL_REGEX,
+  clearCookie,
   setCookie,
   validatePassword,
 } from '@aegis/common';
 import type { NextFunction, Request, Response } from 'express';
 import * as authService from '../services/auth.service';
+import {
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from '../types/auth.types';
 
 /**
  * POST /register
@@ -17,46 +23,36 @@ export const registerUserController = async (
   next: NextFunction
 ) => {
   try {
-    const { username, email, password, mobile } = req.body;
-
     // Input validation
-    if (!username || !email || !password) {
-      throw new BadRequestError(
-        'Missing required fields: username, email, and password are required'
-      );
-    }
-
-    if (typeof username !== 'string' || username.length < 3) {
-      throw new BadRequestError('Username must be at least 3 characters');
-    }
-
-    if (typeof password !== 'string') {
-      throw new BadRequestError('Password must be a string');
-    }
-
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.success) {
-      throw new BadRequestError(passwordValidation.error || 'Invalid password');
-    }
-
-    // Email format validation
-    if (!EMAIL_REGEX.test(email)) {
-      throw new BadRequestError('Invalid email format');
-    }
+    const validatedData = registerSchema.parse(req.body);
 
     // Call service layer for business logic
-    const user = await authService.registerUser({
-      username: username.trim(),
-      email: email.toLowerCase().trim(),
-      password,
-      mobile: mobile?.trim(),
+    const data = await authService.registerUser({
+      username: validatedData.username.trim(),
+      email: validatedData.email.toLowerCase().trim(),
+      password: validatedData.password,
+      mobile: validatedData.mobile?.trim(),
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip,
+    });
+
+    setCookie('access_token', data.accessToken || '', res);
+    setCookie('refresh_token', data.refreshToken || '', res, {
+      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     });
 
     // Return response (controller's responsibility)
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      data: user,
+      data: {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        mobile: data.mobile,
+        role: data.role,
+        createdAt: data.createdAt,
+      },
     });
   } catch (error) {
     next(error);
@@ -74,37 +70,30 @@ export const loginUserController = async (
   next: NextFunction
 ) => {
   try {
-    const { email, password } = req.body;
+    const validatedData = loginSchema.parse(req.body);
 
-    // Input validation
-    if (!email || !password) {
-      throw new BadRequestError('Email and password are required!');
-    }
-
-    if (!EMAIL_REGEX.test(email)) {
-      throw new BadRequestError('Invalid email format');
-    }
-
-    const user = await authService.loginUser({
-      email: email.toLowerCase().trim(),
-      password,
+    const data = await authService.loginUser({
+      email: validatedData.email.toLowerCase().trim(),
+      password: validatedData.password,
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip,
     });
 
-    setCookie('access_token', user.accessToken || '', res);
-    setCookie('refresh_token', user.refreshToken || '', res, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    setCookie('access_token', data.accessToken || '', res);
+    setCookie('refresh_token', data.refreshToken || '', res, {
+      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       success: true,
       message: 'User logged in successfully',
       data: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        mobile: user.mobile,
-        role: user.role,
-        createdAt: user.createdAt,
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        mobile: data.mobile,
+        role: data.role,
+        createdAt: data.createdAt,
       },
     });
   } catch (error) {
@@ -128,16 +117,70 @@ export const refreshTokenController = async (
       throw new BadRequestError('Refresh token required');
     }
 
-    const user = await authService.refreshTokenService(refreshToken);
+    const data = await authService.refreshTokenService(refreshToken);
 
-    setCookie('access_token', user.accessToken || '', res);
-    setCookie('refresh_token', user.refreshToken || '', res, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    setCookie('access_token', data.accessToken || '', res);
+    setCookie('refresh_token', data.refreshToken || '', res, {
+      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       success: true,
       message: 'Token refreshed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+ * POST /logout
+ * Logout the user
+ */
+
+export const logoutController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user.sub;
+
+    if (!userId) {
+      throw new BadRequestError('User ID is required!');
+    }
+
+    await authService.logoutService(userId);
+
+    clearCookie('access_token', res);
+    clearCookie('refresh_token', res);
+
+    res.status(200).json({
+      success: true,
+      message: 'User logged out successfully!',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+ * POST /reset-password
+ * Reset user password
+ */
+
+export const resetPasswordController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const validatedData = resetPasswordSchema.parse(req.body);
+
+    const data = await authService.resetPasswordService(validatedData);
+
+    res.status(200).json({
+      ...data,
     });
   } catch (error) {
     next(error);

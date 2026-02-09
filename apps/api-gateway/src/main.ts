@@ -20,7 +20,6 @@ import {
   createServiceProxy,
   errorMiddleware,
   extractAuthContext,
-  generateInternalToken,
   logger,
   requestTracer,
   sanitizeHeaders,
@@ -30,8 +29,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import 'express-async-errors';
-import proxy from 'express-http-proxy';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { authRateLimiter, rateLimiter } from './utils/rate-limit';
 
 const {
   HOST: host,
@@ -82,19 +80,7 @@ app.use(cookieParser());
 app.use(extractAuthContext);
 app.set('trust proxy', 1);
 
-const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 50,
-  message: {
-    error: 'Too many requests from this IP, please try again after 15 minutes',
-  },
-  legacyHeaders: true,
-  keyGenerator: (req, res) => {
-    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
-    return ipKeyGenerator(ip);
-  },
-});
-
+// General Rate Limiter - 50 request per 15 minutes
 app.use(rateLimiter);
 
 app.get('/gateway-health', (req, res) => {
@@ -119,6 +105,10 @@ app.get('/ready', async (req, res) => {
 app.get('/live', (req, res) => {
   res.json({ alive: true });
 });
+
+// Auth Rate Limiter - 5 requests per 15 minutes (must be BEFORE proxy)
+app.use('/auth/login', authRateLimiter);
+app.use('/auth/register', authRateLimiter);
 
 app.use(
   '/auth',

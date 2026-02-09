@@ -8,7 +8,15 @@ export const requireAccessToken = (
   next: NextFunction
 ) => {
   try {
-    const authHeader = req.cookies['access_token'] || req.headers.Authorization;
+    const cookieToken = req.cookies['access_token'];
+
+    if (cookieToken) {
+      const decoded = verifyAccessToken(cookieToken);
+      req.user = decoded;
+      return next();
+    }
+
+    const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedError('Access token required');

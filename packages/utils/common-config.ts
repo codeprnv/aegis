@@ -1,0 +1,10 @@
+export const AUTH_CONFIG = {
+  ACCESS_TOKEN_EXPIRY: '15m',
+  REFRESH_TOKEN_EXPIRY: '7d',
+  REFRESH_TOKEN_EXPIRY_DAYS: 7,
+  RATE_LIMIT: {
+    WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    MAX_REQUESTS: 50,
+    AUTH_MAX_REQUESTS: 5,
+  },
+} as const;

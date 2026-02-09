@@ -22,6 +22,7 @@ import {
 import { disconnectPrisma, prisma } from '@aegis/database';
 import express from 'express';
 import 'express-async-errors';
+import { startSessionCleanupJob } from './jobs/sessionCleanup';
 import authRoutes from './routes/auth.route';
 
 const port = env.IAM_SERVICE_PORT;
@@ -74,6 +75,7 @@ const server = app.listen(port, () => {
   logger.info(`Listening at ${host}:${port}`);
 });
 server.on('error', (err) => logger.error(err));
+startSessionCleanupJob();
 
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
