@@ -21,21 +21,21 @@
     "paths": {
       "@aegis/common": ["packages/index.ts"],
       "@aegis/types": ["packages/types/index.ts"],
-      "@aegis/database": ["packages/database/client.ts"]
+      "@aegis/database": ["packages/database/index.ts"],
+      "@aegis/auth": ["packages/auth/index.ts"],
+      "@aegis/middlewares": ["packages/middlewares/index.ts"]
     },
     "outDir": "./out-tsc/jest",
-    "types": ["jest", "node"]
+    "types": ["jest", "node"],
+    "rootDir": "../../"
   },
   "include": [
     "jest.config.ts",
     "jest.config.cts",
-    "src/**/*.test.ts",
     "src/**/*.spec.ts",
-    "src/**/*.d.ts"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
+    "src/**/*.test.ts",
+    "src/**/*.d.ts",
+    "src/**/*.ts",
+    "../../packages/**/*"
   ]
 }

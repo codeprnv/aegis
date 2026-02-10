@@ -18,6 +18,8 @@ module.exports = {
         __dirname,
         '../../packages/database/client.ts'
       ),
+      '@aegis/auth': resolve(__dirname, '../../packages/auth'),
+      '@aegis/middlewares': resolve(__dirname, '../../packages/middlewares'),
     },
     extensions: ['.ts', '.js'],
   },

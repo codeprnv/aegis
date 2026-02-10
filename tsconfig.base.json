@@ -22,7 +22,9 @@
     "paths": {
       "@aegis/common": ["packages/index.ts"],
       "@aegis/types": ["packages/types/index.ts"],
-      "@aegis/database": ["packages/database/client.ts"]
+      "@aegis/database": ["packages/database/index.ts"],
+      "@aegis/auth": ["packages/auth/index.ts"],
+      "@aegis/middlewares": ["packages/middlewares/index.ts"]
     }
   }
 }

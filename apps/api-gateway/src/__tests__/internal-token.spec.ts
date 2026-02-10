@@ -1,4 +1,5 @@
-import { generateInternalToken, verifyInternalToken } from '@aegis/common';
+import { generateInternalToken, verifyInternalToken } from "@aegis/auth";
+
 const jwt = require('jsonwebtoken');
 
 const TEST_SECRET = 'fallback-internal-secret-do-not-use-in-prod';

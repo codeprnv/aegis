@@ -12,14 +12,14 @@ dotenv.config({
 const env = iamServiceEnvSchema.parse(process.env);
 Object.freeze(env);
 
+import { disconnectPrisma, prisma } from '@aegis/database';
 import {
   accessLogger,
   errorMiddleware,
   requestTracer,
   requireInternalToken,
   sanitizeHeaders,
-} from '@aegis/common';
-import { disconnectPrisma, prisma } from '@aegis/database';
+} from '@aegis/middlewares';
 import express from 'express';
 import 'express-async-errors';
 import { startSessionCleanupJob } from './jobs/sessionCleanup';

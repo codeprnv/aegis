@@ -1,10 +1,6 @@
-import {
-  AUTH_CONFIG,
-  BadRequestError,
-  clearCookie,
-  setCookie,
-  validatePassword,
-} from '@aegis/common';
+import { clearCookie, setCookie } from '@aegis/auth';
+import { AUTH_CONFIG } from '@aegis/common';
+import { BadRequestError } from '@aegis/middlewares';
 import type { NextFunction, Request, Response } from 'express';
 import * as authService from '../services/auth.service';
 import {

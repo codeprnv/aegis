@@ -32,6 +32,9 @@ export const iamServiceEnvSchema = z.object({
     .string<string>()
     .min(32, 'INTERNAL_JWT_SECRET is required with min length 32'),
   DATABASE_URL: z.coerce.string<string>(),
+  REDIS_HOST: z.coerce.string<string>(),
+  REDIS_PASSWORD: z.coerce.string<string>(),
+  REDIS_PORT: z.coerce.number<number>(),
 });
 
 export type ApiGatewayEnv = z.infer<typeof apiGatewayEnvSchema>;

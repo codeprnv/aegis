@@ -1,18 +1,21 @@
 import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from '@aegis/auth';
+import {
   AUTH_CONFIG,
+  hashPassword,
+  validatePassword,
+  verifyPassword,
+} from '@aegis/common';
+import { prisma } from '@aegis/database';
+import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
-  generateAccessToken,
-  generateRefreshToken,
-  hashPassword,
-  NotFoundError,
   UnauthorizedError,
-  validatePassword,
-  verifyPassword,
-  verifyRefreshToken,
-} from '@aegis/common';
-import { prisma } from '@aegis/database';
+} from '@aegis/middlewares';
 import { UAParser } from 'ua-parser-js';
 import type {
   AuthResponse,
@@ -20,6 +23,11 @@ import type {
   RegisterInput,
   ResetPasswordInput,
 } from '../types/auth.types';
+import {
+  isAccountLocked,
+  recordFailedAttempt,
+  recordSuccessfulLogin,
+} from './account-lockout.service';
 
 export const registerUser = async (
   input: RegisterInput
@@ -138,6 +146,11 @@ export const registerUser = async (
 export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
   const { email, password, userAgent, ipAddress } = input;
 
+  const { locked, reason } = await isAccountLocked(email);
+  if (locked) {
+    throw new ForbiddenError(reason || 'Account is locked!');
+  }
+
   const user = await prisma.user.findFirst({
     where: { email },
     select: {
@@ -152,12 +165,27 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
   });
 
   if (!user || !user.passwordHash) {
+    await recordFailedAttempt(email, ipAddress);
     throw new UnauthorizedError('Invalid email or password');
   }
+
   const isValidPassword = await verifyPassword(password, user.passwordHash);
   if (!isValidPassword) {
-    throw new UnauthorizedError('Invalid email or password');
+    const { shouldLock, attemptRemaining } = await recordFailedAttempt(
+      email,
+      ipAddress
+    );
+    if (shouldLock) {
+      throw new ForbiddenError(
+        'Account locked due to too many failed login attempts. Try again in 15 minutes!'
+      );
+    }
+    throw new UnauthorizedError(
+      `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
+    );
   }
+
+  await recordSuccessfulLogin(email);
 
   const accessToken = generateAccessToken(
     {
@@ -373,10 +401,10 @@ export const resetPasswordService = async (data: ResetPasswordInput) => {
   });
 
   if (!user) {
-    throw new NotFoundError('User does not exists!');
+    throw new BadRequestError('Invalid credentials!');
   }
 
-  // Validate the new password
+  // Validate the new password against password policy
   const validationResult = validatePassword(data.newPassword);
   if (!validationResult.success) {
     throw new BadRequestError(validationResult.error || 'Invalid password!');
@@ -409,6 +437,8 @@ export const resetPasswordService = async (data: ResetPasswordInput) => {
       throw new ForbiddenError('You cannot use your previous password!');
     }
   }
+
+  // TODO: Call the OTP Service to verify the OTP
 
   // Update the password and history transactionally
   await prisma.$transaction(async (tx) => {

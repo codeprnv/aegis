@@ -1,7 +1,7 @@
 process.env.SERVICE_NAME = 'api-gateway';
 
 import { apiGatewayEnvSchema } from '@aegis/types';
-import { id } from 'cls-rtracer';
+// import { id } from 'cls-rtracer';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 
@@ -15,16 +15,15 @@ const env = apiGatewayEnvSchema.parse(process.env);
 
 Object.freeze(env);
 
+import { createServiceProxy, logger } from '@aegis/common';
+import { prisma } from '@aegis/database';
 import {
   accessLogger,
-  createServiceProxy,
   errorMiddleware,
   extractAuthContext,
-  logger,
   requestTracer,
   sanitizeHeaders,
-} from '@aegis/common';
-import { prisma } from '@aegis/database';
+} from '@aegis/middlewares';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -109,6 +108,7 @@ app.get('/live', (req, res) => {
 // Auth Rate Limiter - 5 requests per 15 minutes (must be BEFORE proxy)
 app.use('/auth/login', authRateLimiter);
 app.use('/auth/register', authRateLimiter);
+app.use('/auth/reset-password', authRateLimiter);
 
 app.use(
   '/auth',

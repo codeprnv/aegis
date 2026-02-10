@@ -5,7 +5,7 @@ import {
   extractAuthContext,
   requireAuth,
   requireRole,
-} from '@aegis/common';
+} from '@aegis/middlewares';
 
 import type { Request, Response } from 'express';
 const express = require('express');
