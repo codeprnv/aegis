@@ -27,11 +27,15 @@ enum AuthMethod {
 
 // ------- User Management -------
 model User {
-  id           String  @id @default(uuid())
-  email        String  @unique
-  username     String  @unique
-  mobile       String? @unique
-  passwordHash String? @map("password_hash")
+  id       String  @id @default(uuid())
+  email    String  @unique
+  username String  @unique
+  mobile   String? @unique
+
+  // Password management
+  passwordHash        String?   @map("password_hash")
+  passwordChangedAt   DateTime? @map("password_changed_at")
+  forcePasswordChange Boolean   @default(false) @map("force_password_change")
 
   // Role based access control (RBAC)
   role UserRole @default(USER)
@@ -99,8 +103,10 @@ model PasswordReset {
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  tokenHash      String   @unique @map("token_hash")
-  tokenExpiresAt DateTime @map("token_expires_at")
+  tokenHash      String    @unique @map("token_hash")
+  tokenExpiresAt DateTime  @map("token_expires_at")
+  tokenUsed      Boolean   @default(false) @map("token_used")
+  tokenUsedAt    DateTime? @map("token_used_at")
 
   // OTP
   otpHash      String    @map("otp_hash")
@@ -160,6 +166,7 @@ model Session {
   @@index([refreshTokenHash])
   @@index([userId, expiresAt]) // Active sessions per user
   @@index([userId, revokedAt]) // Non-revoked sessions
+  @@index([tokenFamily, revokedAt])
   @@index([tokenFamily, isCompromised])
   @@map("sessions")
 }

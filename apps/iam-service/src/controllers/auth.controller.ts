@@ -3,11 +3,7 @@ import { AUTH_CONFIG } from '@aegis/common';
 import { BadRequestError } from '@aegis/middlewares';
 import type { NextFunction, Request, Response } from 'express';
 import * as authService from '../services/auth.service';
-import {
-  loginSchema,
-  registerSchema,
-  resetPasswordSchema,
-} from '../types/auth.types';
+import { loginSchema, registerSchema } from '../types/auth.types';
 
 /**
  * POST /register
@@ -48,6 +44,7 @@ export const registerUserController = async (
         mobile: data.mobile,
         role: data.role,
         createdAt: data.createdAt,
+        sessionId: data.sessionId,
       },
     });
   } catch (error) {
@@ -90,6 +87,7 @@ export const loginUserController = async (
         mobile: data.mobile,
         role: data.role,
         createdAt: data.createdAt,
+        sessionId: data.sessionId,
       },
     });
   } catch (error) {
@@ -113,7 +111,7 @@ export const refreshTokenController = async (
       throw new BadRequestError('Refresh token required');
     }
 
-    const data = await authService.refreshTokenService(refreshToken);
+    const data = await authService.refreshTokenService(refreshToken, req.ip);
 
     setCookie('access_token', data.accessToken || '', res);
     setCookie('refresh_token', data.refreshToken || '', res, {
@@ -141,42 +139,23 @@ export const logoutController = async (
 ) => {
   try {
     const userId = req.user.sub;
+    const sessionId = req.headers['x-session-id'] as string;
+    const logoutAll = req.body.logoutAll === true;
 
     if (!userId) {
       throw new BadRequestError('User ID is required!');
     }
 
-    await authService.logoutService(userId);
+    await authService.logoutService(userId, sessionId, logoutAll);
 
     clearCookie('access_token', res);
     clearCookie('refresh_token', res);
 
     res.status(200).json({
       success: true,
-      message: 'User logged out successfully!',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/*
- * POST /reset-password
- * Reset user password
- */
-
-export const resetPasswordController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const validatedData = resetPasswordSchema.parse(req.body);
-
-    const data = await authService.resetPasswordService(validatedData);
-
-    res.status(200).json({
-      ...data,
+      message: logoutAll
+        ? 'Logged out from all devices successfully!'
+        : 'Logged out successfully!',
     });
   } catch (error) {
     next(error);

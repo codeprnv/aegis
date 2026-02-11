@@ -16,12 +16,12 @@ import {
   ForbiddenError,
   UnauthorizedError,
 } from '@aegis/middlewares';
+import { randomUUID } from 'crypto';
 import { UAParser } from 'ua-parser-js';
 import type {
   AuthResponse,
   LoginInput,
   RegisterInput,
-  ResetPasswordInput,
 } from '../types/auth.types';
 import {
   isAccountLocked,
@@ -44,102 +44,113 @@ export const registerUser = async (
     where: {
       OR: [{ email }, { username }],
     },
+    select: { email: true, username: true },
   });
 
   if (existingUser) {
-    if (existingUser.email === email) {
-      throw new ConflictError('A user with this email already exists');
-    }
-    throw new ConflictError('A user with this username already exists');
+    throw new ConflictError(
+      'A user with this email or username already exists'
+    );
   }
 
   // Hash the password
   const passwordHash = await hashPassword(password);
 
+  // Parse user agent
+  const parser = new UAParser(userAgent || '');
+  const deviceInfo = parser.getResult();
+
+  // Generate session ID and token family ID
+  const sessionId = randomUUID();
+  const tokenFamilyId = randomUUID();
+
   // Create the user and session transactionally
-  const {
-    user: createdUser,
-    accessToken,
-    refreshToken,
-  } = await prisma.$transaction(async (tx) => {
-    // Create the user
-    const user = await tx.user.create({
-      data: {
-        username,
-        email,
-        passwordHash,
-        mobile: mobile || null,
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        mobile: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+  const user = await prisma.$transaction(
+    async (tx) => {
+      // Create the user
+      const createdUser = await tx.user.create({
+        data: {
+          username,
+          email,
+          passwordHash,
+          mobile: mobile || null,
+        },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          mobile: true,
+          role: true,
+          createdAt: true,
+        },
+      });
 
-    // Store the current password hash to password history table
-    await tx.passwordHistory.create({
-      data: {
-        userId: user.id,
-        passwordHash: passwordHash,
-      },
-    });
+      // Store the current password hash to password history table
+      await tx.passwordHistory.create({
+        data: {
+          userId: createdUser.id,
+          passwordHash: passwordHash,
+        },
+      });
 
-    const accessToken = generateAccessToken(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      'iam-service',
-      'aegis-client'
-    );
+      return createdUser;
+    },
+    {
+      maxWait: AUTH_CONFIG.MAX_TRANSACTION_WAIT,
+      timeout: AUTH_CONFIG.TRANSACTION_TIMEOUT,
+    }
+  );
 
-    const refreshToken = generateRefreshToken(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      'iam-service',
-      'aegis-client'
-    );
+  const accessToken = generateAccessToken(
+    {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    'iam-service',
+    'aegis-client'
+  );
 
-    const refreshTokenHash = await hashPassword(refreshToken); // reuse the hash password util for hashing refresh token
-    const expiresAt = new Date(
-      Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-    );
-    const parser = new UAParser(userAgent || '');
-    const result = parser.getResult();
+  const refreshToken = generateRefreshToken(
+    {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      sessionId: sessionId,
+    },
+    'iam-service',
+    'aegis-client'
+  );
 
-    // Create Session in database
-    await tx.session.create({
-      data: {
-        userId: user.id,
-        refreshTokenHash: refreshTokenHash,
-        expiresAt: expiresAt,
-        lastUsedAt: new Date(),
-        userAgent,
-        ipAddress,
-        deviceType: result.device.type || 'desktop',
-        deviceName: result.device.model || undefined,
-        osName: result.os.name || undefined,
-        osVersion: result.os.version || undefined,
-        browserName: result.browser.name || undefined,
-        browserVersion: result.browser.version || undefined,
-      },
-    });
+  const refreshTokenHash = await hashPassword(refreshToken);
+  const expiresAt = new Date(
+    Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  );
 
-    return { user, accessToken, refreshToken };
+  await prisma.session.create({
+    data: {
+      id: sessionId,
+      userId: user.id,
+      refreshTokenHash: refreshTokenHash,
+      expiresAt: expiresAt,
+      lastUsedAt: new Date(),
+      userAgent,
+      ipAddress,
+      deviceType: deviceInfo.device.type || 'desktop',
+      deviceName: deviceInfo.device.model || undefined,
+      osName: deviceInfo.os.name || undefined,
+      osVersion: deviceInfo.os.version || undefined,
+      browserName: deviceInfo.browser.name || undefined,
+      browserVersion: deviceInfo.browser.version || undefined,
+      tokenFamily: tokenFamilyId,
+    },
   });
 
   return {
-    ...createdUser,
+    ...user,
     accessToken,
     refreshToken,
+    sessionId: sessionId,
   };
 };
 
@@ -176,14 +187,18 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       ipAddress
     );
     if (shouldLock) {
-      throw new ForbiddenError(
-        'Account locked due to too many failed login attempts. Try again in 15 minutes!'
-      );
+      throw new ForbiddenError(`Account temporarily locked! Try again later!`);
     }
     throw new UnauthorizedError(
       `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
     );
   }
+
+  const parser = new UAParser(userAgent || '');
+  const deviceInfo = parser.getResult();
+
+  const sessionId = randomUUID();
+  const tokenFamilyId = randomUUID();
 
   await recordSuccessfulLogin(email);
 
@@ -202,6 +217,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       sub: user.id,
       email: user.email,
       role: user.role,
+      sessionId: sessionId,
     },
     'iam-service',
     'aegis-client'
@@ -211,24 +227,24 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
   const expiresAt = new Date(
     Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
   );
-  const parser = new UAParser(userAgent || '');
-  const result = parser.getResult();
 
   // Create Session in database
   await prisma.session.create({
     data: {
+      id: sessionId,
       userId: user.id,
       refreshTokenHash: refreshTokenHash,
       expiresAt: expiresAt,
       lastUsedAt: new Date(),
       userAgent,
       ipAddress,
-      deviceType: result.device.type || 'desktop',
-      deviceName: result.device.model || undefined,
-      osName: result.os.name || undefined,
-      osVersion: result.os.version || undefined,
-      browserName: result.browser.name || undefined,
-      browserVersion: result.browser.version || undefined,
+      deviceType: deviceInfo.device.type || 'desktop',
+      deviceName: deviceInfo.device.model || undefined,
+      osName: deviceInfo.os.name || undefined,
+      osVersion: deviceInfo.os.version || undefined,
+      browserName: deviceInfo.browser.name || undefined,
+      browserVersion: deviceInfo.browser.version || undefined,
+      tokenFamily: tokenFamilyId,
     },
   });
 
@@ -239,59 +255,65 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     ...userWithoutPassword,
     accessToken,
     refreshToken,
+    sessionId: sessionId,
   };
 };
 
 export const refreshTokenService = async (
-  oldRefreshToken: string
+  oldRefreshToken: string,
+  ipAddress?: string
 ): Promise<AuthResponse> => {
-  // Verify token
   const decoded = verifyRefreshToken(oldRefreshToken);
 
-  // Find the current active sessions of the user
-  const sessions = await prisma.session.findMany({
+  if (!decoded.sessionId) {
+    throw new UnauthorizedError('Invalid refresh token format!');
+  }
+
+  const session = await prisma.session.findUnique({
     where: {
-      userId: decoded.sub,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
+      id: decoded.sessionId,
     },
   });
 
-  let validSession = null;
-  for (const session of sessions) {
-    const isValid = await verifyPassword(
-      oldRefreshToken,
-      session.refreshTokenHash
-    );
-    if (isValid) {
-      validSession = session;
-      break;
-    }
-  }
-
-  // If no valid session is found, the token is already used or revoked
-  if (!validSession) {
-    const anySession = sessions[0];
-    if (anySession) {
-      await prisma.session.updateMany({
-        where: {
-          tokenFamily: anySession.tokenFamily,
-        },
-        data: {
-          isCompromised: true,
-          revokedAt: new Date(Date.now()),
-          revokedReason: 'Token reuse detected - potential theft',
-        },
-      });
-    }
+  if (!session) {
     throw new UnauthorizedError('Invalid or expired refresh token!');
   }
 
-  if (validSession.isCompromised) {
+  // Check expiry first
+  if (session.expiresAt < new Date()) {
+    throw new UnauthorizedError(
+      'Refresh token has expired. Please log in again'
+    );
+  }
+
+  if (session.revokedAt) {
+    await prisma.session.updateMany({
+      where: {
+        tokenFamily: session.tokenFamily,
+      },
+      data: {
+        isCompromised: true,
+        revokedAt: new Date(),
+        revokedReason: 'Token reuse detected - potential theft',
+      },
+    });
+    throw new UnauthorizedError('Refresh token reuse detected!');
+  }
+
+  if (session.isCompromised) {
     throw new UnauthorizedError('Session has been compromised!');
   }
 
-  // Get the user
+  const isValid = await verifyPassword(
+    oldRefreshToken,
+    session.refreshTokenHash
+  );
+  if (!isValid) {
+    throw new UnauthorizedError('Invalid refresh token!');
+  }
+
+  const validSession = session;
+
   const user = await prisma.user.findUnique({
     where: {
       id: decoded.sub,
@@ -310,7 +332,6 @@ export const refreshTokenService = async (
     throw new UnauthorizedError('User not found!');
   }
 
-  // Generate access token and refresh token
   const accessToken = generateAccessToken(
     {
       sub: user.id,
@@ -321,19 +342,25 @@ export const refreshTokenService = async (
     'aegis-client'
   );
 
+  const newSessionId = randomUUID();
+
   const newRefreshToken = generateRefreshToken(
     {
       sub: user.id,
       email: user.email,
       role: user.role,
+      sessionId: newSessionId,
     },
     'iam-service',
     'aegis-client'
   );
 
-  // Perform token rotation and session update in a transaction
-  const result = await prisma.$transaction(async (tx) => {
-    // Revoke old session
+  const refreshTokenHash = await hashPassword(newRefreshToken);
+  const expiresAt = new Date(
+    Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  );
+
+  await prisma.$transaction(async (tx) => {
     await tx.session.update({
       where: {
         id: validSession.id,
@@ -344,124 +371,58 @@ export const refreshTokenService = async (
       },
     });
 
-    // Create new session
-    const refreshTokenHash = await hashPassword(newRefreshToken);
-    const expiresAt = new Date(
-      Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-    );
-
     await tx.session.create({
       data: {
+        id: newSessionId,
         userId: user.id,
         refreshTokenHash: refreshTokenHash,
         tokenFamily: validSession.tokenFamily,
         rotationCount: validSession.rotationCount + 1,
         expiresAt,
         lastUsedAt: new Date(),
+        userAgent: validSession.userAgent,
+        deviceType: validSession.deviceType,
+        deviceName: validSession.deviceName,
+        osName: validSession.osName,
+        osVersion: validSession.osVersion,
+        browserName: validSession.browserName,
+        browserVersion: validSession.browserVersion,
+        ipAddress: ipAddress || validSession.ipAddress,
       },
     });
-
-    return { accessToken, refreshToken: newRefreshToken };
   });
 
   return {
     ...user,
-    ...result,
+    accessToken,
+    refreshToken: newRefreshToken,
   };
 };
 
-export const logoutService = async (userId: string) => {
-  // Revoke all active sessions of the user
-  await prisma.session.updateMany({
-    where: {
-      userId: userId,
-      revokedAt: null,
-    },
-    data: {
-      revokedAt: new Date(),
-      revokedReason: 'User logged out',
-    },
-  });
-};
-
-export const resetPasswordService = async (data: ResetPasswordInput) => {
-  // Find the user if exists
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: data.email },
-        { mobile: data?.mobile },
-        { username: data?.username },
-      ],
-    },
-    select: {
-      id: true,
-      email: true,
-    },
-  });
-
-  if (!user) {
-    throw new BadRequestError('Invalid credentials!');
-  }
-
-  // Validate the new password against password policy
-  const validationResult = validatePassword(data.newPassword);
-  if (!validationResult.success) {
-    throw new BadRequestError(validationResult.error || 'Invalid password!');
-  }
-
-  // Hash the new password
-  const newPasswordHash = await hashPassword(data.newPassword);
-
-  // Check if the new password hash exists in password history (limit to last 5)
-  const passwords = await prisma.passwordHistory.findMany({
-    where: {
-      userId: user.id,
-    },
-    orderBy: {
-      changedAt: 'desc',
-    },
-    take: 5,
-    select: {
-      passwordHash: true,
-    },
-  });
-
-  for (const password of passwords) {
-    const isMatch = await verifyPassword(
-      data.newPassword,
-      password.passwordHash
-    );
-
-    if (isMatch) {
-      throw new ForbiddenError('You cannot use your previous password!');
-    }
-  }
-
-  // TODO: Call the OTP Service to verify the OTP
-
-  // Update the password and history transactionally
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
+export const logoutService = async (
+  userId: string,
+  sessionId?: string,
+  logoutAll = false
+) => {
+  if (logoutAll) {
+    // Logout from all devices
+    await prisma.session.updateMany({
+      where: { userId: userId, revokedAt: null },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: 'User logged out from all devices',
+      },
+    });
+  } else {
+    // Revoke current session of the user
+    await prisma.session.update({
       where: {
-        email: user.email,
+        id: sessionId,
       },
       data: {
-        passwordHash: newPasswordHash,
+        revokedAt: new Date(),
+        revokedReason: 'User logged out',
       },
     });
-
-    await tx.passwordHistory.create({
-      data: {
-        userId: user.id,
-        passwordHash: newPasswordHash,
-        changedAt: new Date(Date.now()),
-      },
-    });
-  });
-
-  return {
-    success: true,
-    message: 'Password changed successfully!',
-  };
+  }
 };

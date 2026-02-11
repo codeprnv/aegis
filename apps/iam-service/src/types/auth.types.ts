@@ -26,20 +26,6 @@ export const registerSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
-export const resetPasswordSchema = z.object({
-  username: z
-    .string()
-    .min(4, 'Username must be at least 4 characters long!')
-    .optional(),
-  email: z.string().email('Invalid email format!'), // Email is required
-  mobile: z.string().min(10, 'Invalid mobile number!').optional(),
-  newPassword: z
-    .string()
-    .min(8, 'New password should contain minimum 8 characters!'),
-});
-
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-
 export interface AuthResponse {
   id: string;
   username: string;
@@ -51,4 +37,5 @@ export interface AuthResponse {
   userAgent?: string;
   ipAddress?: string;
   createdAt: Date;
+  sessionId?: string;
 }

@@ -23,6 +23,7 @@ import {
 import express from 'express';
 import 'express-async-errors';
 import { startSessionCleanupJob } from './jobs/sessionCleanup';
+import adminRoutes from './routes/admin.route';
 import authRoutes from './routes/auth.route';
 
 const port = env.IAM_SERVICE_PORT;
@@ -67,6 +68,9 @@ app.get('/internal/auth/health', (req, res) => {
 
 // Auth routes
 app.use('/internal/auth', authRoutes);
+
+// Admin routes
+app.use('/internal/admin', adminRoutes);
 
 // Error middleware
 app.use(errorMiddleware);

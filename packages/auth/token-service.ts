@@ -13,6 +13,7 @@ export interface TokenPayload {
   sub: string; // User ID
   email: string;
   role: string;
+  sessionId?: string; // Session ID (Optional for backward compatibility/access token)
 }
 
 export const generateAccessToken = (

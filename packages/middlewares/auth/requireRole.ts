@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../error/index.js';
 
-export const requireRole = (role: 'user' | 'admin') => {
+export const requireRole = (role: 'USER' | 'ADMIN') => {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.auth) {
       return next(new UnauthorizedError('Authentication is required!'));

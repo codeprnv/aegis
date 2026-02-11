@@ -18,7 +18,7 @@
     "axios": "^1.6.0",
     "cls-rtracer": "^2.6.3",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",

@@ -13,15 +13,19 @@ export const isAccountLocked = async (
   const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
 
   // Check redis first
-  const isLockedInRedis = await redisHelper.isLocked(lockKey);
+  try {
+    const isLockedInRedis = await redisHelper.isLocked(lockKey);
 
-  if (isLockedInRedis) {
-    const ttl = await redisHelper.getTTL(lockKey);
-    return {
-      locked: true,
-      remainingSeconds: ttl,
-      reason: 'Too many failed login attempts!',
-    };
+    if (isLockedInRedis) {
+      const ttl = await redisHelper.getTTL(lockKey);
+      return {
+        locked: true,
+        remainingSeconds: ttl,
+        reason: `Too many failed login attempts. Try again in ${ttl ? Math.ceil(ttl / 60) : 15} minutes`,
+      };
+    }
+  } catch (error) {
+    logger.error(error, 'Failed to check Redis for account lockout');
   }
 
   // Fallback:Check database
@@ -37,15 +41,26 @@ export const isAccountLocked = async (
   });
 
   if (user?.accountLocked) {
-    if (user.lockedUntil && user.lockedUntil < new Date()) {
-      // Lock expired - unlock the user account
-      await unlockAccount(email);
-      return { locked: false };
+    // Check if lock has expiration and is expired
+    if (user.lockedUntil) {
+      if (user.lockedUntil < new Date()) {
+        //  Lock expired - unlock the user account
+        await unlockAccount(email);
+        return { locked: false };
+      }
+    } else {
+      // No expiration data - permanently locked
+      return {
+        locked: true,
+        remainingSeconds: undefined,
+        reason: user.accountLockedReason || 'Account permanently locked',
+      };
     }
+    // Lock still active with time remaining
     return {
       locked: true,
       remainingSeconds: user.lockedUntil
-        ? Math.floor(user.lockedUntil.getTime() - Date.now()) / 1000
+        ? Math.floor((user.lockedUntil.getTime() - Date.now()) / 1000)
         : undefined,
       reason: user.accountLockedReason || 'Account locked by admin',
     };
@@ -62,10 +77,17 @@ export const lockAccount = async (
     Date.now() + AUTH_CONFIG.LOCKOUT_DURATION_SECONDS * 1000
   );
 
-  await redisHelper.setLockout(lockKey, AUTH_CONFIG.LOCKOUT_DURATION_SECONDS);
+  try {
+    await redisHelper.setLockout(lockKey, AUTH_CONFIG.LOCKOUT_DURATION_SECONDS);
+  } catch (error) {
+    logger.error(
+      error,
+      'Failed to set Redis lockout, continuing with database'
+    );
+  }
 
   // Persist to database
-  await prisma.user.update({
+  await prisma.user.updateMany({
     where: { email },
     data: {
       accountLocked: true,
@@ -83,7 +105,7 @@ export const lockAccount = async (
       reason,
       lockedUntil,
     },
-    'Account locked'
+    'Account locked due to security policy'
   );
 };
 
@@ -98,7 +120,7 @@ export const unlockAccount = async (email: string): Promise<void> => {
   ]);
 
   // Update database
-  await prisma.user.update({
+  await prisma.user.updateMany({
     where: { email },
     data: {
       accountLocked: false,
