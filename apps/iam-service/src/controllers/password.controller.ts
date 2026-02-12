@@ -77,7 +77,8 @@ export const resetPasswordTokenController = async (
     const validatedData = resetPasswordTokenSchema.parse(req.body);
 
     await forgotPasswordService.resetPasswordWithToken(
-      validatedData.tokenHash,
+      validatedData.resetId,
+      validatedData.token,
       validatedData.newPassword
     );
 

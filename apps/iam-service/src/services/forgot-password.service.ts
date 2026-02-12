@@ -190,7 +190,7 @@ export const resetPasswordWithToken = async (
   // Find password reset request by token
   const passwordResetRequest = await prisma.passwordReset.findFirst({
     where: {
-      id: resetId, // using token hash instead of plain token (hash token from client)
+      id: resetId,
       tokenExpiresAt: { gt: new Date() },
       tokenUsed: false,
       otpUsed: false, // Password not reset using OTP
@@ -252,5 +252,7 @@ export const resetPasswordWithToken = async (
     message: 'Password reset successful',
     userId: passwordResetRequest.userId,
     email: passwordResetRequest.user.email,
+    resetId: resetId,
+    token: token,
   });
 };

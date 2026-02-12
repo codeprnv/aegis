@@ -7,6 +7,5 @@ export * from './error/errorHandler.js';
 export * from './error/index.js';
 export * from './logs/access-logger.js';
 export * from './logs/request-tracer.js';
-export * from './rateLimiter.js';
 export * from './sanitizeHeaders.js';
 

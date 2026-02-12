@@ -6,6 +6,10 @@
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "rootDir": "../../"
   },
-  "include": ["src/**/*.ts", "../../packages/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../packages/**/*.ts",
+    "../iam-service/src/middlewares/rateLimiter.ts"
+  ],
   "exclude": []
 }

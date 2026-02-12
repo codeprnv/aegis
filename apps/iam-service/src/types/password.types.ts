@@ -11,7 +11,8 @@ export const resetPasswordSchema = z.object({
 });
 
 export const resetPasswordTokenSchema = z.object({
-  tokenHash: z.string().min(128, 'Invalid reset token hash'),
+  resetId: z.string().uuid('Invalid reset ID'),
+  token: z.string().length(64, 'Invalid reset token'),
   newPassword: z.string().min(8, 'Password must be at least 8 characters long'),
 });
 
