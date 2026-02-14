@@ -1,19 +1,29 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
+# Compiled output
 dist
 tmp
 out-tsc
+*.tsbuildinfo
 
-# dependencies
+# Dependencies
 node_modules
 
+# Environment variables
 .env
-.env.production
-.env.development
 .env.*
 **/.env
 **/.env.*
+
+# Generated files
+/generated
+/generated/**
+/prisma/**/migrations
+
+# Nx cache
+.nx
+.nx/cache
+.nx/workspace-data
 
 # IDEs and editors
 /.idea
@@ -24,30 +34,28 @@ node_modules
 .settings/
 *.sublime-workspace
 
-# IDE - VSCode
+# VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
-/.sass-cache
-/connect.lock
+# Testing
 /coverage
-/libpeerconnection.log
+test-output
+testem.log
+
+# Logs
 npm-debug.log
 yarn-error.log
-testem.log
+
+# Misc
+/.sass-cache
+/connect.lock
+/libpeerconnection.log
 /typings
 
 # System Files
 .DS_Store
 Thumbs.db
-
-.nx/cache
-.nx/workspace-data
-
-test-output
-
-/generated/prisma
