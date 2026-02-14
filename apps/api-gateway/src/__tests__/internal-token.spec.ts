@@ -1,12 +1,11 @@
-import { generateInternalToken, verifyInternalToken } from "@aegis/auth";
-
-const jwt = require('jsonwebtoken');
-
 const TEST_SECRET = 'fallback-internal-secret-do-not-use-in-prod';
 
-beforeAll(() => {
-  process.env.INTERNAL_JWT_SECRET = TEST_SECRET;
-});
+// Set env var BEFORE importing the module
+process.env.INTERNAL_JWT_SECRET = TEST_SECRET;
+
+import { generateInternalToken, verifyInternalToken } from '@aegis/auth';
+
+const jwt = require('jsonwebtoken');
 
 describe('Internal Token - Validation Tests', () => {
   const validPayload = { sub: 'user-123', role: 'user' };

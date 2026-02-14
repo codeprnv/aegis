@@ -9,6 +9,8 @@ export default {
   coverageDirectory: '../../coverage/apps/api-gateway',
   moduleNameMapper: {
     '^@aegis/common$': '<rootDir>/../../packages/index.ts',
+    '^@aegis/auth$': '<rootDir>/../../packages/auth/index.ts',
+    '^@aegis/middlewares$': '<rootDir>/../../packages/middlewares/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

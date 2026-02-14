@@ -34,7 +34,7 @@ export const createTestApp = () => {
   app.get(
     '/admin',
     requireAuth,
-    requireRole('admin'),
+    requireRole('ADMIN'),
     (_req: Request, res: Response) => {
       res.sendStatus(200);
     }

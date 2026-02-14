@@ -1,3 +1,11 @@
+jest.mock('@aegis/middlewares', () => ({
+  ...jest.requireActual('@aegis/middlewares'),
+  errorMiddleware: jest.fn((err: any, req: any, res: any, next: any) => next()),
+  extractAuthContext: jest.fn((req: any, res: any, next: any) => next()),
+  requireAuth: jest.fn((req: any, res: any, next: any) => next()),
+  requireRole: jest.fn(() => (req: any, res: any, next: any) => next()),
+}));
+
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
 import { createTestApp } from '../test-utils/test-app';
@@ -11,7 +19,7 @@ describe('API Gateway Auth Contracts', () => {
     process.env.JWT_SECRET = JWT_SECRET;
   });
 
-  const createToken = (payload: { id: string; role: 'user' | 'admin' }) => {
+  const createToken = (payload: { id: string; role: 'USER' | 'ADMIN' }) => {
     return jwt.sign(payload, JWT_SECRET, {
       expiresIn: '1h',
     });
@@ -23,7 +31,7 @@ describe('API Gateway Auth Contracts', () => {
     });
 
     it('returns 200 for authenticated user', async () => {
-      const token = createToken({ id: 'user-1', role: 'user' });
+      const token = createToken({ id: 'user-1', role: 'USER' });
       const res = await request(app)
         .get('/me')
         .set('Authorization', `Bearer ${token}`)
@@ -36,7 +44,7 @@ describe('API Gateway Auth Contracts', () => {
   });
   describe('GET /admin', () => {
     it('returns 403 for authenticated non-admin user', async () => {
-      const token = createToken({ id: 'user-1', role: 'user' });
+      const token = createToken({ id: 'user-1', role: 'USER' });
 
       await request(app)
         .get('/admin')
@@ -45,7 +53,7 @@ describe('API Gateway Auth Contracts', () => {
     });
 
     it('returns 200 for admin user', async () => {
-      const token = createToken({ id: 'user-1', role: 'admin' });
+      const token = createToken({ id: 'user-1', role: 'ADMIN' });
 
       await request(app)
         .get('/admin')

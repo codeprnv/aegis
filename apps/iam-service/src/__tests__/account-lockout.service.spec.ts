@@ -1,9 +1,9 @@
 import { AUTH_CONFIG } from '@aegis/common';
 import { prisma, RedisHelper } from '@aegis/database';
 import {
-    isAccountLocked,
-    recordFailedAttempt,
-    unlockAccount,
+  isAccountLocked,
+  recordFailedAttempt,
+  unlockAccount,
 } from '../services/account-lockout.service';
 
 jest.mock('@aegis/database', () => ({
@@ -11,6 +11,7 @@ jest.mock('@aegis/database', () => ({
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
   },
   RedisHelper: jest.fn().mockImplementation(function (this: any) {
@@ -97,7 +98,7 @@ describe('Account Lockout Service', () => {
 
       const result = await isAccountLocked('test@example.com');
       expect(result.locked).toBe(false);
-      expect(prisma.user.update).toHaveBeenCalled(); // Should call unlock
+      expect(prisma.user.updateMany).toHaveBeenCalled(); // Should call unlock
     });
   });
 
@@ -118,7 +119,7 @@ describe('Account Lockout Service', () => {
       const result = await recordFailedAttempt('test@example.com', '127.0.0.1');
       expect(result.shouldLock).toBe(true);
       expect(mock.setLockout).toHaveBeenCalled();
-      expect(prisma.user.update).toHaveBeenCalledWith(
+      expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { email: 'test@example.com' },
           data: expect.objectContaining({ accountLocked: true }),
@@ -133,7 +134,7 @@ describe('Account Lockout Service', () => {
       await unlockAccount('test@example.com');
       expect(mock.clearLockout).toHaveBeenCalled();
       expect(mock.resetCounter).toHaveBeenCalled();
-      expect(prisma.user.update).toHaveBeenCalledWith(
+      expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { email: 'test@example.com' },
           data: expect.objectContaining({ accountLocked: false }),
