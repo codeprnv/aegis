@@ -48,7 +48,7 @@
     "@nx/js": "22.3.3",
     "@nx/node": "22.3.3",
     "@nx/web": "22.3.3",
-    "@nx/webpack": "22.3.3",
+    "@nx/webpack": "22.6.3",
     "@nx/workspace": "22.3.3",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
     "@svgr/webpack": "^8.0.1",
