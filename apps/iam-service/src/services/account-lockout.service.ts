@@ -1,7 +1,13 @@
 import { AUTH_CONFIG, logger, REDIS_KEYS } from '@aegis/common';
-import { prisma, RedisHelper } from '@aegis/database';
-
-const redisHelper = new RedisHelper();
+import {
+  prisma,
+  clearLockout as redisClearLockout,
+  getTTL as redisGetTTL,
+  incrementWithTTL as redisIncrementWithTTL,
+  isLocked as redisIsLocked,
+  resetCounter as redisResetCounter,
+  setLockout as redisSetLockout,
+} from '@aegis/database';
 
 export const isAccountLocked = async (
   email: string
@@ -14,10 +20,10 @@ export const isAccountLocked = async (
 
   // Check redis first
   try {
-    const isLockedInRedis = await redisHelper.isLocked(lockKey);
+    const isLockedInRedis = await redisIsLocked(lockKey);
 
     if (isLockedInRedis) {
-      const ttl = await redisHelper.getTTL(lockKey);
+      const ttl = await redisGetTTL(lockKey);
       return {
         locked: true,
         remainingSeconds: ttl,
@@ -78,7 +84,7 @@ export const lockAccount = async (
   );
 
   try {
-    await redisHelper.setLockout(lockKey, AUTH_CONFIG.LOCKOUT_DURATION_SECONDS);
+    await redisSetLockout(lockKey, AUTH_CONFIG.LOCKOUT_DURATION_SECONDS);
   } catch (error) {
     logger.error(
       error,
@@ -115,8 +121,8 @@ export const unlockAccount = async (email: string): Promise<void> => {
 
   // Clear Redis keys
   await Promise.all([
-    redisHelper.resetCounter(attemptKey),
-    redisHelper.clearLockout(lockKey),
+    redisResetCounter(attemptKey),
+    redisClearLockout(lockKey),
   ]);
 
   // Update database
@@ -145,7 +151,7 @@ export const recordFailedAttempt = async (
 }> => {
   const attemptKey = REDIS_KEYS.FAILED_ATTEMPTS(email);
 
-  const attemptCount = await redisHelper.incrementWithTTL(
+  const attemptCount = await redisIncrementWithTTL(
     attemptKey,
     AUTH_CONFIG.ATTEMPT_WINDOW_SECONDS
   );

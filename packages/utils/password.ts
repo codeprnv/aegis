@@ -4,7 +4,7 @@ import { logger } from './logger.js';
 
 const ARGON2_CONFIG = {
   type: argon2.argon2id,
-  memoryCost: 65536, // 64 MB
+  memoryCost: 19456, // 19 MB
   timeCost: 3, // iterations
   parallelism: 1,
   hashLength: 32,

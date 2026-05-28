@@ -162,7 +162,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     throw new ForbiddenError(reason || 'Account is locked!');
   }
 
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
     where: { email },
     select: {
       id: true,
@@ -187,7 +187,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       ipAddress
     );
     if (shouldLock) {
-      throw new ForbiddenError(`Account temporarily locked! Try again later!`);
+      throw new ForbiddenError(`Account temporarily locked, Try again later!`);
     }
     throw new UnauthorizedError(
       `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
