@@ -30,6 +30,9 @@ const port = env.IAM_SERVICE_PORT;
 const host = env.HOST;
 const app = express();
 
+// Trust the API Gateway proxy to get the real client IP
+app.set('trust proxy', 1);
+
 app.use(requestTracer); // Add correlation ID
 app.use(sanitizeHeaders); // Clean headers
 app.use(accessLogger); // Log requests

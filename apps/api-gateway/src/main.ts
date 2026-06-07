@@ -106,9 +106,8 @@ app.get('/live', (req, res) => {
 });
 
 // Auth Rate Limiter - 5 requests per 15 minutes (must be BEFORE proxy)
-app.use('/auth/login', authRateLimiter);
-app.use('/auth/register', authRateLimiter);
-app.use('/auth/reset-password', authRateLimiter);
+// Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
+app.use(/^\/auth\/(login|register|reset-password|forgot-password)\/?$/i, authRateLimiter);
 
 app.use(
   '/auth',

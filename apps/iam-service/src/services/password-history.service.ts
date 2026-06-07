@@ -21,20 +21,17 @@ export const isPasswordReused = async (
     },
   });
 
-  // Check all passwords in parallel
-  const results = await Promise.all(
-    history.map((record) => verifyPassword(newPassword, record.passwordHash))
-  );
-
-  // Check if any matched
-  const matchIndex = results.findIndex((isMatch) => isMatch);
-  if (matchIndex !== -1) {
-    logger.warn({
-      message: 'Password reuse detected',
-      userId,
-      lastUsed: history[matchIndex].changedAt,
-    });
-    return true;
+  // Check passwords sequentially to prevent Argon2 DoS (RAM spike)
+  for (const record of history) {
+    const isMatch = await verifyPassword(newPassword, record.passwordHash);
+    if (isMatch) {
+      logger.warn({
+        message: 'Password reuse detected',
+        userId,
+        lastUsed: record.changedAt,
+      });
+      return true;
+    }
   }
 
   return false;

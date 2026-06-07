@@ -143,6 +143,19 @@ export const resetPasswordWithOTP = async (
     );
   }
 
+  // Atomically mark OTP as used immediately to prevent TOCTOU race conditions
+  const updateResult = await prisma.passwordReset.updateMany({
+    where: { id: passwordResetRequest.id, otpUsed: false },
+    data: {
+      otpUsed: true,
+      otpUsedAt: new Date(),
+    },
+  });
+
+  if (updateResult.count === 0) {
+    throw new BadRequestError('OTP has already been used or expired!');
+  }
+
   // Import password history service
   const { canUsePassword, validateAndStorePassword } = await import(
     './password-history.service.js'
@@ -154,14 +167,7 @@ export const resetPasswordWithOTP = async (
   // Update password in password history
   await validateAndStorePassword(user.id, newPassword);
 
-  // Mark OTP as used
-  await prisma.passwordReset.update({
-    where: { id: passwordResetRequest.id },
-    data: {
-      otpUsed: true,
-      otpUsedAt: new Date(),
-    },
-  });
+  // OTP is already marked as used above
 
   // Revoke all session - force re-login
   await prisma.session.updateMany({
@@ -214,6 +220,19 @@ export const resetPasswordWithToken = async (
     throw new UnauthorizedError('Invalid or expired reset link!');
   }
 
+  // Atomically mark token as used immediately to prevent TOCTOU
+  const updateResult = await prisma.passwordReset.updateMany({
+    where: { id: passwordResetRequest.id, tokenUsed: false },
+    data: {
+      tokenUsed: true,
+      tokenUsedAt: new Date(),
+    },
+  });
+
+  if (updateResult.count === 0) {
+    throw new UnauthorizedError('Reset link has already been used!');
+  }
+
   // Validate the password against password policy
   const isPasswordValid = await validatePassword(newPassword);
   if (isPasswordValid.success === false && isPasswordValid.error) {
@@ -230,14 +249,7 @@ export const resetPasswordWithToken = async (
   // Update password in password history
   await validateAndStorePassword(passwordResetRequest.userId, newPassword);
 
-  // Mark token as used
-  await prisma.passwordReset.update({
-    where: { id: passwordResetRequest.id },
-    data: {
-      tokenUsed: true,
-      tokenUsedAt: new Date(),
-    },
-  });
+  // Token is already marked as used above
 
   // Revoke all sessions
   await prisma.session.updateMany({

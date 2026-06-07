@@ -1,19 +1,10 @@
 //@ts-check
 
-const { composePlugins, withNx } = require('@nx/next');
-
-/**
- * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
- **/
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Use this to set Nx-specific options
-  // See: https://nx.dev/recipes/next/next-config-setup
+  // Temporarily bypassing withNx wrapper to prevent Next.js from
+  // crashing when the Nx Console extension locks the project-graph cache
   nx: {},
 };
 
-const plugins = [
-  // Add more Next.js plugins to this list if needed.
-  withNx,
-];
-
-module.exports = composePlugins(...plugins)(nextConfig);
+module.exports = nextConfig;

@@ -14,6 +14,7 @@ export interface TokenPayload {
   email: string;
   role: string;
   sessionId?: string; // Session ID (Optional for backward compatibility/access token)
+  type?: 'access' | 'refresh';
 }
 
 export const generateAccessToken = (
@@ -21,7 +22,7 @@ export const generateAccessToken = (
   issuer = 'iam-service',
   audience = 'api-service'
 ): string => {
-  return jwt.sign(payload, ACCESS_TOKEN_SECRET, {
+  return jwt.sign({ ...payload, type: 'access' }, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
     issuer,
     audience,
@@ -37,6 +38,10 @@ export const verifyAccessToken = (
     audience: expectedAudience,
   }) as TokenPayload;
 
+  if (decoded.type !== 'access') {
+    throw new BadRequestError('Invalid token type: Expected access token');
+  }
+
   return decoded;
 };
 
@@ -46,7 +51,7 @@ export const generateRefreshToken = (
   audience = 'api-service'
 ) => {
   if (!payload) throw new BadRequestError('Invalid Payload!');
-  return jwt.sign(payload, REFRESH_TOKEN_SECRET, {
+  return jwt.sign({ ...payload, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
     expiresIn: REFRESH_TOKEN_EXPIRY,
     issuer: issuer,
     audience: audience,
@@ -61,6 +66,10 @@ export const verifyRefreshToken = (
     issuer: 'iam-service',
     audience: expectedAudience,
   }) as TokenPayload;
+
+  if (decoded.type !== 'refresh') {
+    throw new BadRequestError('Invalid token type: Expected refresh token');
+  }
 
   return decoded;
 };

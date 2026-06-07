@@ -18,12 +18,12 @@ export const extractAuthContext = (
       token,
       process.env.JWT_SECRET as string
     ) as {
-      id: string;
+      sub: string;
       role: 'user' | 'admin';
     };
 
     req.auth = {
-      id: decodedToken.id,
+      id: decodedToken.sub,
       role: decodedToken.role,
     };
   } catch (error) {

@@ -361,15 +361,29 @@ export const refreshTokenService = async (
   );
 
   await prisma.$transaction(async (tx) => {
-    await tx.session.update({
+    const updateResult = await tx.session.updateMany({
       where: {
         id: validSession.id,
+        revokedAt: null,
       },
       data: {
         revokedAt: new Date(Date.now()),
         revokedReason: 'Token rotation',
       },
     });
+
+    if (updateResult.count === 0) {
+      // Race condition caught! Another concurrent request already revoked it.
+      await tx.session.updateMany({
+        where: { tokenFamily: validSession.tokenFamily },
+        data: {
+          isCompromised: true,
+          revokedAt: new Date(),
+          revokedReason: 'Token reuse detected - potential theft',
+        },
+      });
+      throw new UnauthorizedError('Refresh token reuse detected!');
+    }
 
     await tx.session.create({
       data: {

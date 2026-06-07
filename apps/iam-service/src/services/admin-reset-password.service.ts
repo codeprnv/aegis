@@ -3,6 +3,7 @@
 import { hashPassword, logger } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { BadRequestError, ForbiddenError } from '@aegis/middlewares';
+import crypto from 'crypto';
 
 // Generate temporary password (admin action)
 // Format: TempPass#2024AB
@@ -10,7 +11,7 @@ import { BadRequestError, ForbiddenError } from '@aegis/middlewares';
 const generateTemporaryPassword = (): string => {
   const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZ23456789'; // Excluding lowercase letters and confusing chars (O, 0, I, 1)
   const randomChars = Array.from({ length: 6 }, () =>
-    chars.charAt(Math.floor(Math.random() * chars.length))
+    chars.charAt(crypto.randomInt(0, chars.length))
   ).join('');
 
   return `TempPass#${randomChars}`;
