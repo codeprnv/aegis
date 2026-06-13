@@ -7,6 +7,10 @@ export const apiGatewayEnvSchema = z.object({
   JWT_SECRET: z.coerce
     .string<string>()
     .min(32, 'JWT_SECRET is required with min length 32'),
+  JWT_REFRESH_SECRET: z.coerce
+    .string<string>()
+    .min(32, 'JWT_REFRESH_SECRET should be min length 32')
+    .optional(),
   INTERNAL_JWT_SECRET: z.coerce
     .string<string>()
     .min(32, 'INTERNAL_JWT_SECRET is required with min length 32'),
@@ -28,6 +32,10 @@ export const iamServiceEnvSchema = z.object({
   JWT_SECRET: z.coerce
     .string<string>()
     .min(32, 'JWT_SECRET is required with min length 32'),
+  JWT_REFRESH_SECRET: z.coerce
+    .string<string>()
+    .min(32, 'JWT_REFRESH_SECRET should be min length 32')
+    .optional(),
   INTERNAL_JWT_SECRET: z.coerce
     .string<string>()
     .min(32, 'INTERNAL_JWT_SECRET is required with min length 32'),

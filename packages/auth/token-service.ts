@@ -6,7 +6,8 @@ import { AUTH_CONFIG } from '../utils/common-config.js';
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET as string;
 const ACCESS_TOKEN_EXPIRY = AUTH_CONFIG.ACCESS_TOKEN_EXPIRY;
 
-const REFRESH_TOKEN_SECRET = process.env.JWT_SECRET as string;
+// Use dedicated refresh secret if available, otherwise fall back to JWT_SECRET
+const REFRESH_TOKEN_SECRET = (process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET) as string;
 const REFRESH_TOKEN_EXPIRY = AUTH_CONFIG.REFRESH_TOKEN_EXPIRY;
 
 export interface TokenPayload {
@@ -20,7 +21,7 @@ export interface TokenPayload {
 export const generateAccessToken = (
   payload: TokenPayload,
   issuer = 'iam-service',
-  audience = 'api-service'
+  audience = 'aegis-client'
 ): string => {
   return jwt.sign({ ...payload, type: 'access' }, ACCESS_TOKEN_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRY,
@@ -31,7 +32,7 @@ export const generateAccessToken = (
 
 export const verifyAccessToken = (
   token: string,
-  expectedAudience = 'api-service'
+  expectedAudience = 'aegis-client'
 ): TokenPayload => {
   const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET, {
     issuer: 'iam-service',
@@ -48,7 +49,7 @@ export const verifyAccessToken = (
 export const generateRefreshToken = (
   payload: TokenPayload,
   issuer = 'iam-service',
-  audience = 'api-service'
+  audience = 'aegis-client'
 ) => {
   if (!payload) throw new BadRequestError('Invalid Payload!');
   return jwt.sign({ ...payload, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
@@ -60,7 +61,7 @@ export const generateRefreshToken = (
 
 export const verifyRefreshToken = (
   token: string,
-  expectedAudience = 'api-service'
+  expectedAudience = 'aegis-client'
 ): TokenPayload => {
   const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET, {
     issuer: 'iam-service',

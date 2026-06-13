@@ -7,11 +7,11 @@ import {
 } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { BadRequestError, UnauthorizedError } from '@aegis/middlewares';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 
-// Generate 6-digit OTP
+// Generate 6-digit OTP using CSPRNG
 const generateOTP = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 999999).toString();
 };
 
 // Request password reset OTP

@@ -20,6 +20,7 @@ import {
   requireInternalToken,
   sanitizeHeaders,
 } from '@aegis/middlewares';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import 'express-async-errors';
 import { startSessionCleanupJob } from './jobs/sessionCleanup';
@@ -33,6 +34,7 @@ const app = express();
 // Trust the API Gateway proxy to get the real client IP
 app.set('trust proxy', 1);
 
+app.use(cookieParser()); // Parse cookies for refresh token reads
 app.use(requestTracer); // Add correlation ID
 app.use(sanitizeHeaders); // Clean headers
 app.use(accessLogger); // Log requests

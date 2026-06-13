@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-const jwt = require('jsonwebtoken');
+import { verifyAccessToken } from '../../auth/token-service.js';
 
 export const extractAuthContext = (
   req: Request,
@@ -7,20 +7,14 @@ export const extractAuthContext = (
   next: NextFunction
 ) => {
   const token =
-    req.cookies['access_token'] || req.headers.authorization?.split(' ')[1];
+    req.cookies?.['access_token'] || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
     return next();
   }
 
   try {
-    const decodedToken = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as {
-      sub: string;
-      role: 'user' | 'admin';
-    };
+    const decodedToken = verifyAccessToken(token);
 
     req.auth = {
       id: decodedToken.sub,
