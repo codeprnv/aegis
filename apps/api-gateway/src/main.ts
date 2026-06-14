@@ -39,6 +39,9 @@ const {
 } = env;
 const app = express();
 
+// Trust reverse proxies to get the real client IP (e.g. from Cloudflare, Nginx, or AWS ALB)
+app.set('trust proxy', 1);
+
 app.use(requestTracer);
 app.use(sanitizeHeaders);
 app.use(accessLogger);

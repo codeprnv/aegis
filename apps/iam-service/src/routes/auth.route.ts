@@ -1,4 +1,4 @@
-import { requireAccessToken } from '@aegis/middlewares';
+import { requireInternalToken } from '@aegis/middlewares';
 import express, { type Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import * as passwordController from '../controllers/password.controller';
@@ -24,7 +24,9 @@ router.post(
   refreshRateLimiter,
   authController.refreshTokenController
 );
-router.post('/logout', requireAccessToken, authController.logoutController);
+router.post('/logout', requireInternalToken('iam-service'), authController.logoutController);
+router.get('/me', requireInternalToken('iam-service'), authController.getMeController);
+router.get('/verify-email', authController.verifyEmailController);
 
 // Password management routes (unauthenticated)
 router.post(
@@ -46,7 +48,7 @@ router.post(
 // Password management routes (authenticated)
 router.post(
   '/change-password',
-  requireAccessToken,
+  requireInternalToken('iam-service'),
   passwordController.changePasswordController
 );
 

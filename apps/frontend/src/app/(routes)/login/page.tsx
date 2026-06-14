@@ -123,7 +123,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormControl>
                           <Input
-                            placeholder="Username"
+                            placeholder="Email Address"
                             {...field}
                             className="bg-white/[0.05] border-white/[0.1] rounded-xl px-4 py-6 text-sm text-white placeholder-slate-400 focus-visible:ring-cyan-500/50 focus-visible:ring-offset-0 focus-visible:bg-white/[0.08] transition-all relative z-20"
                           />

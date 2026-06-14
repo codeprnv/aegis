@@ -128,34 +128,35 @@ aegis/
 
 ## 3. Current Status
 
-| Component                 | Status         | Details                                           |
-| ------------------------- | -------------- | ------------------------------------------------- |
-| API Gateway               | ✅ Complete    | Edge routing, token transformation, rate limiting |
-| IAM Service               | ✅ Complete    | Full auth with Redis security hardening           |
-| Notification Service      | ⏳ Not Started | Email (Resend), templates, event-driven           |
-| User Service              | ⏳ Not Started | Profile management, preferences                   |
-| File Storage Service      | ⏳ Not Started | Uploads, image processing                         |
-| Audit Service             | ⏳ Not Started | Logging, compliance                               |
-| Role & Permission Service | ⏳ Not Started | Advanced RBAC                                     |
-| Frontend                  | 🚀 Starting    | Next.js, Shadcn UI, Aceternity UI                 |
+| Component                 | Status         | Details                                            |
+| ------------------------- | -------------- | -------------------------------------------------- |
+| API Gateway               | ✅ Complete    | Edge routing, token transformation, rate limiting  |
+| IAM Service               | ✅ Complete    | Full auth with Redis security hardening            |
+| Notification Service      | ✅ Complete    | Email (Resend), BullMQ, Upstash Redis, Idempotency |
+| Events Package            | ✅ Complete    | `@aegis/events` shared package for event enqueuing |
+| User Service              | ⏳ Not Started | Profile management, preferences                    |
+| File Storage Service      | ⏳ Not Started | Uploads, image processing                          |
+| Audit Service             | ⏳ Not Started | Logging, compliance                                |
+| Role & Permission Service | ⏳ Not Started | Advanced RBAC                                      |
+| Frontend                  | 🚀 Starting    | Next.js Hybrid (Middleware, Layouts, Zustand)      |
 
 ---
 
 ## 4. Sprint Roadmap
 
-| Sprint               | Service                      | Timeline     | Priority                      |
-| -------------------- | ---------------------------- | ------------ | ----------------------------- |
-| Sprint 1             | IAM Service                  | Week 1–3     | ✅ Done                       |
-| —                    | API Gateway                  | Week 2–3     | ✅ Done                       |
-| **Sprint 2**         | **Notification Service**     | **Week 4–5** | 🔴 Critical (blockers in IAM) |
-| **Frontend Phase 1** | **Auth UI (Login/Register)** | **Week 4–5** | 🚀 Starting Now               |
-| Sprint 3             | User Service                 | Week 6–7     | 🟡 Important                  |
-| Frontend Phase 2     | Dashboard + Profile UI       | Week 6–7     | 🟡 Important                  |
-| Sprint 4             | File Storage Service         | Week 8–9     | 🟢 Normal                     |
-| Sprint 5             | Audit Service                | Week 10–11   | 🟢 Normal                     |
-| Sprint 6             | Role & Permission Service    | Week 12–13   | 🟢 Normal                     |
-| Frontend Phase 3     | Admin Panel                  | Week 12–14   | 🟢 Normal                     |
-| Deployment           | Docker + CI/CD               | Week 14–15   | 🟢 Normal                     |
+| Sprint               | Service                      | Timeline     | Priority        |
+| -------------------- | ---------------------------- | ------------ | --------------- |
+| Sprint 1             | IAM Service                  | Week 1–3     | ✅ Done         |
+| —                    | API Gateway                  | Week 2–3     | ✅ Done         |
+| **Sprint 2**         | **Notification Service**     | **Week 4**   | ✅ Done         |
+| **Frontend Phase 1** | **Auth UI (Login/Register)** | **Week 4–5** | 🚀 Starting Now |
+| Sprint 3             | User Service                 | Week 6–7     | 🟡 Important    |
+| Frontend Phase 2     | Dashboard + Profile UI       | Week 6–7     | 🟡 Important    |
+| Sprint 4             | File Storage Service         | Week 8–9     | 🟢 Normal       |
+| Sprint 5             | Audit Service                | Week 10–11   | 🟢 Normal       |
+| Sprint 6             | Role & Permission Service    | Week 12–13   | 🟢 Normal       |
+| Frontend Phase 3     | Admin Panel                  | Week 12–14   | 🟢 Normal       |
+| Deployment           | Docker + CI/CD               | Week 14–15   | 🟢 Normal       |
 
 ---
 
@@ -220,25 +221,31 @@ The IAM (Identity and Access Management) service is the authentication core of A
 
 ---
 
-## 6. Sprint 2 — Notification Service
+## 6. Sprint 2 — Notification Service (Complete)
 
 ### Purpose
 
 The Notification Service is a dedicated microservice for all communication delivery. It decouples notification logic from business logic, ensuring IAM and other services don't manage email/SMS directly.
 
-### Why This Is Critical
+### Completed Features
 
-Without the Notification Service, the following IAM flows are broken:
+**Architecture & Queuing:**
 
-- Forgot Password (cannot deliver reset link)
-- Email Verification (cannot verify new accounts)
-- Welcome Email (not sent on registration)
-- Password Change Confirmation (not sent)
+- ✅ Established `@aegis/events` shared package containing `NotificationEvent` enums and `enqueueNotification` helper.
+- ✅ BullMQ integration backed by Upstash Redis for reliable job processing.
+- ✅ Database tracking in PostgreSQL (the `notifications` table) to maintain an audit trail of all sent messages.
+- ✅ Idempotency checks utilizing BullMQ `job.id` to prevent duplicate email dispatch in case of worker retries.
+
+**Email Delivery:**
+
+- ✅ Resend integration successfully routing transactional emails.
+- ✅ Custom React-Email templates implemented for `Welcome`, `EmailVerification`, `PasswordReset`, and more.
+- ✅ Strict Email Verification flow: Users cannot log in until they verify their email.
 
 ### Architecture
 
 ```
-IAM Service  ──────► Event Bus (Redis Pub/Sub or BullMQ)
+IAM Service  ──────► Upstash Redis (BullMQ)
 User Service ──────►        │
                             ▼
                    Notification Service
@@ -248,43 +255,20 @@ User Service ──────►        │
                Resend (Email)      Future: SMS / Push
 ```
 
-### Planned Features
-
-**Email Delivery:**
-
-- [ ] Resend integration (free tier: 3,000 emails/month)
-- [ ] HTML email templates (password reset, welcome, verification, change confirmation)
-- [ ] Retry logic with exponential backoff
-- [ ] Delivery status tracking
-
-**Template System:**
-
-- [ ] Handlebars or MJML-based templates
-- [ ] Brand-consistent Aegis email design
-- [ ] Dark/light responsive email templates
-
-**Event-Driven Architecture:**
-
-- [ ] Listen for events: `user.registered`, `password.reset.requested`, `password.changed`, `email.verification.requested`
-- [ ] Queue-based processing (BullMQ + Redis)
-- [ ] Dead letter queue for failed deliveries
-
 ### API Endpoints
 
 ```
-POST /notifications/email          ← Send email directly
-POST /notifications/email/template ← Send from template
-GET  /notifications/status/:id     ← Check delivery status
+GET  /health                   ← Postgres-aware health check
 ```
 
 ### Environment Variables Needed
 
 ```env
 RESEND_API_KEY=re_xxxxxxxxxxxx
-FROM_EMAIL=noreply@aegis.dev
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
 FRONTEND_URL=http://localhost:3000
-REDIS_HOST=localhost
-REDIS_PORT=6379
+DATABASE_URL=postgresql://...
 ```
 
 ### Implementation Plan
@@ -445,40 +429,43 @@ Role: USER
 | Zustand                  | Global state (auth state, user session)                  |
 | Framer Motion            | Animations (used by Aceternity)                          |
 
-### Design Direction
+### Design Direction & Next.js Architecture
 
 **Aesthetic:** Cyberpunk / Zero Trust Security  
-**Color Scheme:** Deep dark backgrounds, cyan + purple gradients, glassmorphic panels  
-**Reference:** The glassmorphic card with a glowing particle shield (as per design concept)
+**Color Scheme:** Deep dark backgrounds, cyan + purple gradients, glassmorphic panels
 
-**Key Design Rules:**
+**Hybrid Architecture (Server + Client):**
+Aegis UI leverages the Next.js App Router to its full potential while maintaining robust client-side state:
 
-- Glassmorphic form containers: `bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl`
-- Gradient buttons: `bg-gradient-to-r from-cyan-400 to-purple-500`
-- Input fields: `bg-transparent border border-white/20 focus:border-cyan-400`
-- Aceternity `Card Spotlight` wraps Shadcn form components
-- Aceternity `Sparkles` or `Vortex Background` for the particle shield visual
+- **Next.js Route Groups & Layouts**:
+  - `(auth)/layout.tsx` abstracts the Cyberpunk UI wrappers (background ripples, cards) so login/register code is DRY.
+  - `(protected)/layout.tsx` serves as a Server Component fetching user data.
+- **Middleware**: Edge-level route protection in `src/middleware.ts` intercepts unauthorized users before pages render.
+- **Zustand + Axios**: `api.ts` continues to handle client-side operations and token refresh interceptors, while `authStore` is hydrated from Server Components to provide instant state without loading spinners.
 
 ### Page Structure
 
 ```
 frontend/
 ├── app/
-│   ├── (auth)/
-│   │   ├── login/page.tsx          ← Login page
-│   │   ├── register/page.tsx       ← Register page
-│   │   ├── forgot-password/page.tsx
-│   │   └── reset-password/page.tsx
-│   ├── (dashboard)/
-│   │   ├── layout.tsx              ← Protected layout (auth guard)
-│   │   ├── dashboard/page.tsx      ← Main dashboard
-│   │   ├── profile/page.tsx        ← User profile
-│   │   ├── sessions/page.tsx       ← Active sessions management
-│   │   └── settings/page.tsx       ← Account settings
-│   └── (admin)/
-│       ├── layout.tsx              ← Admin guard (ADMIN role only)
-│       ├── users/page.tsx
-│       └── audit/page.tsx
+│   ├── (routes)/
+│   │   ├── (auth)/                 ← Unauthenticated route group
+│   │   │   ├── layout.tsx          ← Auth UI Wrapper (Cyberpunk shield, cards)
+│   │   │   ├── login/page.tsx
+│   │   │   ├── register/page.tsx
+│   │   │   ├── verify/page.tsx     ← Strict email verification handler
+│   │   │   ├── forgot-password/page.tsx
+│   │   │   └── reset-password/page.tsx
+│   │   ├── (protected)/            ← Authenticated route group
+│   │   │   ├── layout.tsx          ← Server Component: fetches user, hydrates Zustand
+│   │   │   ├── dashboard/page.tsx
+│   │   │   ├── profile/page.tsx
+│   │   │   ├── sessions/page.tsx
+│   │   │   └── settings/page.tsx
+│   │   └── (admin)/
+│   │       ├── layout.tsx          ← Admin guard
+│   │       ├── users/page.tsx
+│   │       └── audit/page.tsx
 ├── components/
 │   ├── ui/                         ← Shadcn components
 │   ├── aceternity/                 ← Aceternity components

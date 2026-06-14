@@ -90,8 +90,14 @@ export const adminResetPassword = async (
       },
     });
   });
-  // TODO: Send email to user with temporary password
-
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.ADMIN_PASSWORD_RESET, {
+      userId: targetUserId,
+      email: targetUser.email,
+      username: targetUser.username,
+      temporaryPassword: temporaryPassword,
+    });
+  }).catch(err => logger.error('Failed to enqueue admin password reset email', err));
   // Debug: For development
   logger.warn({
     message: 'Admin reset user password',

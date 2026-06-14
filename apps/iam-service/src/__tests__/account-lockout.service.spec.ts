@@ -1,10 +1,17 @@
 import { AUTH_CONFIG } from '@aegis/common';
-import { prisma, RedisHelper } from '@aegis/database';
+import { prisma } from '@aegis/database';
 import {
   isAccountLocked,
   recordFailedAttempt,
   unlockAccount,
 } from '../services/account-lockout.service';
+
+const mockIsLocked = jest.fn();
+const mockGetTTL = jest.fn();
+const mockIncrementWithTTL = jest.fn();
+const mockSetLockout = jest.fn();
+const mockClearLockout = jest.fn();
+const mockResetCounter = jest.fn();
 
 jest.mock('@aegis/database', () => ({
   prisma: {
@@ -14,14 +21,12 @@ jest.mock('@aegis/database', () => ({
       updateMany: jest.fn(),
     },
   },
-  RedisHelper: jest.fn().mockImplementation(function (this: any) {
-    this.isLocked = jest.fn();
-    this.getTTL = jest.fn();
-    this.setLockout = jest.fn();
-    this.clearLockout = jest.fn();
-    this.resetCounter = jest.fn();
-    this.incrementWithTTL = jest.fn();
-  }),
+  isLocked: (...args: any[]) => mockIsLocked(...args),
+  getTTL: (...args: any[]) => mockGetTTL(...args),
+  incrementWithTTL: (...args: any[]) => mockIncrementWithTTL(...args),
+  setLockout: (...args: any[]) => mockSetLockout(...args),
+  clearLockout: (...args: any[]) => mockClearLockout(...args),
+  resetCounter: (...args: any[]) => mockResetCounter(...args),
 }));
 
 jest.mock('@aegis/common', () => ({
@@ -42,32 +47,14 @@ jest.mock('@aegis/common', () => ({
 }));
 
 describe('Account Lockout Service', () => {
-  let mockRedisHelper: any;
-
-  beforeAll(() => {
-    const mock = RedisHelper as jest.Mock;
-    if (mock.mock.instances.length > 0) {
-      mockRedisHelper = mock.mock.instances[0];
-    }
-  });
-
   beforeEach(() => {
     jest.clearAllMocks();
-    if (!mockRedisHelper) {
-      const mock = RedisHelper as jest.Mock;
-      if (mock.mock.instances.length > 0) {
-        mockRedisHelper = mock.mock.instances[0];
-      }
-    }
   });
-
-  const getMock = () => mockRedisHelper;
 
   describe('isAccountLocked', () => {
     it('should return true if locked in redis', async () => {
-      const mock = getMock();
-      mock.isLocked.mockResolvedValue(true);
-      mock.getTTL.mockResolvedValue(100);
+      mockIsLocked.mockResolvedValue(true);
+      mockGetTTL.mockResolvedValue(100);
 
       const result = await isAccountLocked('test@example.com');
       expect(result.locked).toBe(true);
@@ -75,8 +62,7 @@ describe('Account Lockout Service', () => {
     });
 
     it('should return true if locked in db and active', async () => {
-      const mock = getMock();
-      mock.isLocked.mockResolvedValue(false);
+      mockIsLocked.mockResolvedValue(false);
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         accountLocked: true,
         lockedUntil: new Date(Date.now() + 100000),
@@ -89,8 +75,7 @@ describe('Account Lockout Service', () => {
     });
 
     it('should unlock if db lock expired', async () => {
-      const mock = getMock();
-      mock.isLocked.mockResolvedValue(false);
+      mockIsLocked.mockResolvedValue(false);
       (prisma.user.findUnique as jest.Mock).mockResolvedValue({
         accountLocked: true,
         lockedUntil: new Date(Date.now() - 100000), // Expired
@@ -104,8 +89,7 @@ describe('Account Lockout Service', () => {
 
   describe('recordFailedAttempt', () => {
     it('should increment attempts and not lock if below threshold', async () => {
-      const mock = getMock();
-      mock.incrementWithTTL.mockResolvedValue(2); // Threshold is 3
+      mockIncrementWithTTL.mockResolvedValue(2); // Threshold is 3
 
       const result = await recordFailedAttempt('test@example.com', '127.0.0.1');
       expect(result.shouldLock).toBe(false);
@@ -113,12 +97,11 @@ describe('Account Lockout Service', () => {
     });
 
     it('should lock account if threshold reached', async () => {
-      const mock = getMock();
-      mock.incrementWithTTL.mockResolvedValue(3); // Threshold reached
+      mockIncrementWithTTL.mockResolvedValue(3); // Threshold reached
 
       const result = await recordFailedAttempt('test@example.com', '127.0.0.1');
       expect(result.shouldLock).toBe(true);
-      expect(mock.setLockout).toHaveBeenCalled();
+      expect(mockSetLockout).toHaveBeenCalled();
       expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { email: 'test@example.com' },
@@ -130,10 +113,9 @@ describe('Account Lockout Service', () => {
 
   describe('unlockAccount', () => {
     it('should clear redis and db lock', async () => {
-      const mock = getMock();
       await unlockAccount('test@example.com');
-      expect(mock.clearLockout).toHaveBeenCalled();
-      expect(mock.resetCounter).toHaveBeenCalled();
+      expect(mockClearLockout).toHaveBeenCalled();
+      expect(mockResetCounter).toHaveBeenCalled();
       expect(prisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { email: 'test@example.com' },

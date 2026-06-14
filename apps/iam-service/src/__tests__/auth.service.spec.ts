@@ -12,10 +12,24 @@ jest.mock('@aegis/database', () => ({
   prisma: {
     user: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
     },
     session: {
       create: jest.fn(),
     },
+    $transaction: jest.fn().mockImplementation(async (cb) => {
+      // Mock the transaction object `tx` to be the same as `prisma`
+      const tx = {
+        user: { 
+          create: jest.fn().mockResolvedValue({ id: 'test-user-id', username: 'testuser', email: 'test@example.com', role: 'USER' }), 
+          update: jest.fn() 
+        },
+        session: { create: jest.fn(), updateMany: jest.fn() },
+        passwordHistory: { create: jest.fn() },
+      };
+      return cb(tx);
+    }),
   },
 }));
 
@@ -23,6 +37,7 @@ jest.mock('@aegis/common', () => ({
   ...jest.requireActual('@aegis/common'),
   hashPassword: jest.fn(),
   verifyPassword: jest.fn(),
+  hashTokenSHA256: jest.fn().mockReturnValue('mock-sha256-hash'),
 }));
 
 jest.mock('@aegis/auth', () => ({
@@ -41,8 +56,8 @@ describe('Auth Service - loginUser', () => {
     id: 'user-123',
     email: 'test@example.com',
     username: 'testuser',
-    mobile: '1234567890',
     role: 'user',
+    mobile: '1234567890',
     passwordHash: 'hashed-password',
     createdAt: new Date(),
   };
@@ -52,7 +67,7 @@ describe('Auth Service - loginUser', () => {
   });
 
   it('should return user with access and refresh tokens on valid credentials', async () => {
-    (prisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (isAccountLocked as jest.Mock).mockResolvedValue({ locked: false });
     (verifyPassword as jest.Mock).mockResolvedValue(true);
     (recordSuccessfulLogin as jest.Mock).mockResolvedValue(undefined);
@@ -62,7 +77,7 @@ describe('Auth Service - loginUser', () => {
       password: 'password123',
     });
 
-    expect(prisma.user.findFirst).toHaveBeenCalledWith({
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { email: 'test@example.com' },
       select: expect.any(Object),
     });
@@ -79,7 +94,7 @@ describe('Auth Service - loginUser', () => {
   });
 
   it('should throw UnauthorizedError if user not found', async () => {
-    (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
     await expect(
       loginUser({ email: 'wrong@example.com', password: 'password' })
@@ -87,7 +102,7 @@ describe('Auth Service - loginUser', () => {
   });
 
   it('should throw ForbiddenError if account is locked', async () => {
-    (prisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (isAccountLocked as jest.Mock).mockResolvedValue({
       locked: true,
       reason: 'Admin lock',
@@ -100,7 +115,7 @@ describe('Auth Service - loginUser', () => {
   });
 
   it('should throw UnauthorizedError and record attempt if password invalid', async () => {
-    (prisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (isAccountLocked as jest.Mock).mockResolvedValue({ locked: false });
     (verifyPassword as jest.Mock).mockResolvedValue(false);
     (recordFailedAttempt as jest.Mock).mockResolvedValue({ shouldLock: false });
@@ -116,7 +131,7 @@ describe('Auth Service - loginUser', () => {
   });
 
   it('should throw ForbiddenError if account gets locked after failed attempt', async () => {
-    (prisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (isAccountLocked as jest.Mock).mockResolvedValue({ locked: false });
     (verifyPassword as jest.Mock).mockResolvedValue(false);
     (recordFailedAttempt as jest.Mock).mockResolvedValue({ shouldLock: true });

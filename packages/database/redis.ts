@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis';
+import { Redis } from '@upstash/redis';
 import { logger } from '../utils/logger.js';
 
 const globalForRedis = globalThis as unknown as {
@@ -6,42 +6,19 @@ const globalForRedis = globalThis as unknown as {
 };
 
 export const createRedisClient = () => {
-  const host = process.env.REDIS_HOST;
-  const password = process.env.REDIS_PASSWORD;
-  const port = process.env.REDIS_PORT;
+  const url = process.env.UPSTASH_REDIS_REST_URL || 'http://localhost:8080';
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || 'dummy-token';
 
-  if (!host || !port || !password) {
-    throw new Error(
-      'REDIS_HOST, REDIS_PORT, and REDIS_PASSWORD environment variables must be set'
-    );
+  if (!process.env.UPSTASH_REDIS_REST_URL && process.env.NODE_ENV !== 'test') {
+    logger.warn('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables are missing');
   }
 
   const redis = new Redis({
-    host,
-    password,
-    port: Number(port),
-    maxRetriesPerRequest: 3,
-    retryStrategy(times) {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    },
-    reconnectOnError: (error) => {
-      logger.error(error, 'Redis client error:');
-      return true;
-    },
+    url,
+    token,
   });
 
-  redis.on('connect', () => {
-    logger.info('Redis client connected!');
-  });
-
-  redis.on('ready', () => {
-    logger.info('Redis client ready to accept commands');
-  });
-
-  redis.on('error', (error) => {
-    logger.error(error, 'Redis client error:');
-  });
+  logger.info('Upstash Redis client initialized');
 
   return redis;
 };
@@ -53,5 +30,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const disconnectRedis = async () => {
-  await redis.quit();
+  // @upstash/redis uses HTTP, so there's no persistent TCP connection to close.
+  // We keep this function for backwards compatibility with the existing interface.
+  logger.info('disconnectRedis called (noop for Upstash)');
 };

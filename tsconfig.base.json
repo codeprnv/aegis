@@ -17,6 +17,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
+    "jsx": "react-jsx",
     "esModuleInterop": true,
     "customConditions": ["@aegis/source"],
     "paths": {
@@ -24,7 +25,9 @@
       "@aegis/types": ["packages/types/index.ts"],
       "@aegis/database": ["packages/database/index.ts"],
       "@aegis/auth": ["packages/auth/index.ts"],
-      "@aegis/middlewares": ["packages/middlewares/index.ts"]
+      "@aegis/middlewares": ["packages/middlewares/index.ts"],
+      "@aegis/events": ["packages/events/index.ts"],
+      "@aegis/email-templates": ["packages/email-templates/index.ts"]
     }
   }
 }

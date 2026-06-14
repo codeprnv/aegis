@@ -33,7 +33,8 @@ export const errorMiddleware = (
       err: error,
       method: req.method,
       url: req.url,
-      body: req.body,
+      // Mask passwords from request body in logs
+      body: req.body ? { ...req.body, password: '[REDACTED]' } : undefined,
     },
     'Global Error Handler'
   );

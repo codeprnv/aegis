@@ -3,7 +3,7 @@
 import {
   errorMiddleware,
   extractAuthContext,
-  requireAuth,
+  requireAccessToken,
   requireRole,
 } from '@aegis/middlewares';
 
@@ -23,7 +23,7 @@ export const createTestApp = () => {
   /* Test Routes */
 
   /* 1. Authenticated user route */
-  app.get('/me', requireAuth, (req: Request, res: Response) => {
+  app.get('/me', requireAccessToken, (req: Request, res: Response) => {
     res.status(200).json({
       id: req.auth?.id,
       role: req.auth?.role,
@@ -33,7 +33,7 @@ export const createTestApp = () => {
   /* 2. Admin-only route */
   app.get(
     '/admin',
-    requireAuth,
+    requireAccessToken,
     requireRole('ADMIN'),
     (_req: Request, res: Response) => {
       res.sendStatus(200);

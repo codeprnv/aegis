@@ -63,13 +63,22 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
     },
   });
 
-  // TODO: Send email with OTP using notification service (Send reset id and token)
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.PASSWORD_RESET_REQUESTED, {
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      otp: otp,
+      resetToken: token,
+      expiresAt: otpExpiry,
+    });
+  }).catch(err => logger.error('Failed to enqueue password reset email', err));
 
   // For dev, log the OTP
   logger.info({
     message: 'Password reset OTP sent',
     userId: user.id,
-    otp: otp,
+    otp: '[REDACTED]',
     otpExpiresAt: otpExpiry,
   });
 };
@@ -178,7 +187,13 @@ export const resetPasswordWithOTP = async (
     },
   });
 
-  // TODO: Send confirmation email
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
+      userId: user.id,
+      email: user.email,
+      username: user.email, // using email as fallback if username isn't queried
+    });
+  }).catch(err => logger.error('Failed to enqueue password reset confirmation email', err));
 
   logger.info({
     message: 'Password reset successful',
@@ -251,7 +266,13 @@ export const resetPasswordWithToken = async (
 
   // Token is already marked as used above
 
-  // Revoke all sessions
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
+      userId: passwordResetRequest.userId,
+      email: passwordResetRequest.user.email,
+      username: passwordResetRequest.user.username,
+    });
+  }).catch(err => logger.error('Failed to enqueue password reset confirmation email', err));
   await prisma.session.updateMany({
     where: { userId: passwordResetRequest.userId, revokedAt: null },
     data: {

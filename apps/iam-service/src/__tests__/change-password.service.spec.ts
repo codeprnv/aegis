@@ -10,16 +10,26 @@ jest.mock('@aegis/common', () => ({
   ...jest.requireActual('@aegis/common'),
   validatePassword: jest.fn(),
   verifyPassword: jest.fn(),
-  logger: jest.fn(),
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
 }));
 
 jest.mock('@aegis/database', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
+    $transaction: jest.fn().mockImplementation((callback) => callback(require('@aegis/database').prisma)),
     session: {
       updateMany: jest.fn(),
+    },
+    passwordHistory: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
     },
   },
 }));

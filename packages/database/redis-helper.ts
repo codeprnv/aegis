@@ -15,22 +15,22 @@ export async function incrementWithTTL(
   key: string,
   ttl: number
 ): Promise<number> {
-  const multi = redis.multi();
-  multi.incr(key);
-  multi.expire(key, ttl, 'NX');
+  const p = redis.pipeline();
+  p.incr(key);
+  p.expire(key, ttl);
 
-  const results = await multi.exec();
+  // @upstash/redis pipeline.exec() returns an array of results, not [error, result] pairs
+  const results = await p.exec();
 
-  // Results is [[error, result], [error, result]]
-  // Check if first command (incr) succeeded (error is null)
-  if (results && results[0] && results[0][0] === null) {
-    return results[0][1] as number;
+  if (results && results.length > 0) {
+    // The first command was incr(key)
+    return results[0] as number;
   }
   throw new Error('Failed to increment Redis key!');
 }
 
 export async function setLockout(key: string, ttl: number): Promise<void> {
-  await redis.set(key, 'locked', 'EX', ttl);
+  await redis.set(key, 'locked', { ex: ttl });
 }
 
 export async function resetCounter(key: string): Promise<void> {

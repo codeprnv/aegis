@@ -1,6 +1,5 @@
 export * from './auth/extractAuthContext.js';
 export * from './auth/requireAccessToken.js';
-export * from './auth/requireAuth.js';
 export * from './auth/requireInternalToken.js';
 export * from './auth/requireRole.js';
 export * from './error/errorHandler.js';

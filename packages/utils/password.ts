@@ -81,7 +81,7 @@ export function validatePassword(password: string, options?: PasswordOptions) {
   const passwordSchema = new PasswordValidator();
   passwordSchema
     .min(options?.MIN_LENGTH || 8)
-    .max(options?.MAX_LENGTH || 16)
+    .max(options?.MAX_LENGTH || 128)
     .lowercase(options?.LOWERCASE_CHARS || 3)
     .uppercase(options?.UPPERCASE_CHARS || 1)
     .digits(options?.DIGITS || 1)

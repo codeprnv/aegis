@@ -6,10 +6,11 @@ import {
 import {
   AUTH_CONFIG,
   hashPassword,
+  hashTokenSHA256,
   validatePassword,
   verifyPassword,
 } from '@aegis/common';
-import { prisma } from '@aegis/database';
+import { prisma, redis } from '@aegis/database';
 import {
   BadRequestError,
   ConflictError,
@@ -39,7 +40,7 @@ export const registerUser = async (
     throw new BadRequestError(passwordValidation.error || 'Invalid password');
   }
 
-  // Check if user already exists
+  // Check if user already exists in DB
   const existingUser = await prisma.user.findFirst({
     where: {
       OR: [{ email }, { username }],
@@ -53,16 +54,98 @@ export const registerUser = async (
     );
   }
 
+  // Check if user is already pending in Redis
+  const pendingKeys = await redis.keys('registration:*');
+  for (const key of pendingKeys) {
+    const pendingData = await redis.get<any>(key);
+    if (pendingData && (pendingData.email === email || pendingData.username === username)) {
+      throw new ConflictError(
+        'A user with this email or username is already pending verification. Please check your email.'
+      );
+    }
+  }
+
   // Hash the password
   const passwordHash = await hashPassword(password);
 
+  // Generate a verification token
+  const emailVerificationToken = randomUUID();
+
+  const pendingUserData = {
+    username,
+    email,
+    passwordHash,
+    mobile: mobile || null,
+    userAgent,
+    ipAddress,
+  };
+
+  // Store in Redis with a 24-hour expiration (86400 seconds)
+  await redis.setex(`registration:${emailVerificationToken}`, 86400, pendingUserData);
+
+  // Enqueue emails asynchronously (don't block the request)
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    // We only send the Verification Email at this stage
+    enqueueNotification(NotificationEvent.EMAIL_VERIFICATION_REQUESTED, {
+      userId: 'pending',
+      email: email,
+      username: username,
+      verificationToken: emailVerificationToken,
+    });
+  }).catch((err) => {
+    console.error('Failed to enqueue registration emails', err);
+  });
+
+  return {
+    message: 'Registration accepted. Please check your email to verify your account.',
+  };
+};
+
+export const verifyEmailService = async (token: string): Promise<AuthResponse> => {
+  const redisKey = `registration:${token}`;
+  const pendingData = await redis.get<any>(redisKey);
+
+  if (!pendingData) {
+    throw new BadRequestError('Invalid or expired verification token');
+  }
+
   // Parse user agent
-  const parser = new UAParser(userAgent || '');
+  const parser = new UAParser(pendingData.userAgent || '');
   const deviceInfo = parser.getResult();
 
-  // Generate session ID and token family ID
+  // Generate IDs
+  const userId = randomUUID();
   const sessionId = randomUUID();
   const tokenFamilyId = randomUUID();
+
+  // Pre-generate tokens to allow fast hash outside of transaction
+  const accessToken = generateAccessToken(
+    {
+      sub: userId,
+      email: pendingData.email,
+      role: 'USER',
+    },
+    'iam-service',
+    'aegis-client'
+  );
+
+  const refreshToken = generateRefreshToken(
+    {
+      sub: userId,
+      email: pendingData.email,
+      role: 'USER',
+      sessionId: sessionId,
+    },
+    'iam-service',
+    'aegis-client'
+  );
+
+  // Hash the refresh token using fast SHA-256
+  const refreshTokenHash = hashTokenSHA256(refreshToken);
+
+  const expiresAt = new Date(
+    Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+  );
 
   // Create the user and session transactionally
   const user = await prisma.$transaction(
@@ -70,10 +153,14 @@ export const registerUser = async (
       // Create the user
       const createdUser = await tx.user.create({
         data: {
-          username,
-          email,
-          passwordHash,
-          mobile: mobile || null,
+          id: userId,
+          username: pendingData.username,
+          email: pendingData.email,
+          passwordHash: pendingData.passwordHash,
+          mobile: pendingData.mobile || null,
+          role: 'USER',
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
         },
         select: {
           id: true,
@@ -89,7 +176,27 @@ export const registerUser = async (
       await tx.passwordHistory.create({
         data: {
           userId: createdUser.id,
-          passwordHash: passwordHash,
+          passwordHash: pendingData.passwordHash,
+        },
+      });
+
+      // Create the session
+      await tx.session.create({
+        data: {
+          id: sessionId,
+          userId: createdUser.id,
+          refreshTokenHash: refreshTokenHash,
+          expiresAt: expiresAt,
+          lastUsedAt: new Date(),
+          userAgent: pendingData.userAgent,
+          ipAddress: pendingData.ipAddress,
+          deviceType: deviceInfo.device.type || 'desktop',
+          deviceName: deviceInfo.device.model || undefined,
+          osName: deviceInfo.os.name || undefined,
+          osVersion: deviceInfo.os.version || undefined,
+          browserName: deviceInfo.browser.name || undefined,
+          browserVersion: deviceInfo.browser.version || undefined,
+          tokenFamily: tokenFamilyId,
         },
       });
 
@@ -101,49 +208,18 @@ export const registerUser = async (
     }
   );
 
-  const accessToken = generateAccessToken(
-    {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    },
-    'iam-service',
-    'aegis-client'
-  );
+  // Delete the pending registration from Redis
+  await redis.del(redisKey);
 
-  const refreshToken = generateRefreshToken(
-    {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      sessionId: sessionId,
-    },
-    'iam-service',
-    'aegis-client'
-  );
-
-  const refreshTokenHash = await hashPassword(refreshToken);
-  const expiresAt = new Date(
-    Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
-  );
-
-  await prisma.session.create({
-    data: {
-      id: sessionId,
+  // Welcome email can be sent here if we didn't send it before
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.USER_REGISTERED, {
       userId: user.id,
-      refreshTokenHash: refreshTokenHash,
-      expiresAt: expiresAt,
-      lastUsedAt: new Date(),
-      userAgent,
-      ipAddress,
-      deviceType: deviceInfo.device.type || 'desktop',
-      deviceName: deviceInfo.device.model || undefined,
-      osName: deviceInfo.os.name || undefined,
-      osVersion: deviceInfo.os.version || undefined,
-      browserName: deviceInfo.browser.name || undefined,
-      browserVersion: deviceInfo.browser.version || undefined,
-      tokenFamily: tokenFamilyId,
-    },
+      email: user.email,
+      username: user.username,
+    });
+  }).catch((err) => {
+    console.error('Failed to enqueue welcome email', err);
   });
 
   return {
@@ -223,29 +299,42 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     'aegis-client'
   );
 
-  const refreshTokenHash = await hashPassword(refreshToken); // reuse the hash password util for hashing refresh token
+  const refreshTokenHash = hashTokenSHA256(refreshToken);
   const expiresAt = new Date(
     Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
   );
 
-  // Create Session in database
-  await prisma.session.create({
-    data: {
-      id: sessionId,
-      userId: user.id,
-      refreshTokenHash: refreshTokenHash,
-      expiresAt: expiresAt,
-      lastUsedAt: new Date(),
-      userAgent,
-      ipAddress,
-      deviceType: deviceInfo.device.type || 'desktop',
-      deviceName: deviceInfo.device.model || undefined,
-      osName: deviceInfo.os.name || undefined,
-      osVersion: deviceInfo.os.version || undefined,
-      browserName: deviceInfo.browser.name || undefined,
-      browserVersion: deviceInfo.browser.version || undefined,
-      tokenFamily: tokenFamilyId,
-    },
+  // Execute login transactionally
+  await prisma.$transaction(async (tx) => {
+    // Record login
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    // Create Session in database
+    await tx.session.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        refreshTokenHash: refreshTokenHash,
+        expiresAt: expiresAt,
+        lastUsedAt: new Date(),
+        userAgent,
+        ipAddress,
+        deviceType: deviceInfo.device.type || 'desktop',
+        deviceName: deviceInfo.device.model || undefined,
+        osName: deviceInfo.os.name || undefined,
+        osVersion: deviceInfo.os.version || undefined,
+        browserName: deviceInfo.browser.name || undefined,
+        browserVersion: deviceInfo.browser.version || undefined,
+        tokenFamily: tokenFamilyId,
+      },
+    });
   });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -304,10 +393,7 @@ export const refreshTokenService = async (
     throw new UnauthorizedError('Session has been compromised!');
   }
 
-  const isValid = await verifyPassword(
-    oldRefreshToken,
-    session.refreshTokenHash
-  );
+  const isValid = hashTokenSHA256(oldRefreshToken) === session.refreshTokenHash;
   if (!isValid) {
     throw new UnauthorizedError('Invalid refresh token!');
   }
@@ -355,7 +441,7 @@ export const refreshTokenService = async (
     'aegis-client'
   );
 
-  const refreshTokenHash = await hashPassword(newRefreshToken);
+  const refreshTokenHash = hashTokenSHA256(newRefreshToken);
   const expiresAt = new Date(
     Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
   );
@@ -427,9 +513,9 @@ export const logoutService = async (
         revokedReason: 'User logged out from all devices',
       },
     });
-  } else {
+  } else if (sessionId) {
     // Revoke current session of the user
-    await prisma.session.update({
+    await prisma.session.updateMany({
       where: {
         id: sessionId,
       },
@@ -439,4 +525,24 @@ export const logoutService = async (
       },
     });
   }
+};
+
+export const getMeService = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      mobile: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) {
+    throw new UnauthorizedError('User not found!');
+  }
+
+  return user;
 };

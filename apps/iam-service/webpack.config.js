@@ -17,6 +17,7 @@ module.exports = {
       '@aegis/database': resolve(__dirname, '../../packages/database/index.ts'),
       '@aegis/auth': resolve(__dirname, '../../packages/auth'),
       '@aegis/middlewares': resolve(__dirname, '../../packages/middlewares'),
+      '@aegis/events': resolve(__dirname, '../../packages/events/index.ts'),
     },
     extensions: ['.ts', '.js'],
   },

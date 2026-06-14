@@ -205,3 +205,27 @@ model AuthConfig {
   @@index([methodName])
   @@map("auth_configs")
 }
+
+// -------- Notification Service -----------
+model Notification {
+  id                String    @id @default(uuid())
+  eventType         String    @map("event_type")
+  channel           String    @default("email")
+  recipientId       String    @map("recipient_id")
+  recipientEmail    String    @map("recipient_email")
+  templateName      String?   @map("template_name")
+  subject           String?
+  status            String    @default("pending")    // pending | sent | failed | bounced
+  providerMessageId String?   @map("provider_message_id")
+  attempts          Int       @default(0)
+  lastAttemptAt     DateTime? @map("last_attempt_at")
+  errorMessage      String?   @map("error_message")
+  idempotencyKey    String    @unique @map("idempotency_key")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  sentAt            DateTime? @map("sent_at")
+
+  @@index([recipientId])
+  @@index([eventType])
+  @@index([status])
+  @@map("notifications")
+}

@@ -3,3 +3,5 @@ export * from './utils/common-config.js';
 export * from './utils/logger.js';
 export * from './utils/password.js';
 
+export * from './utils/hash.js';
+

@@ -73,7 +73,13 @@ export const changePassword = async (
     },
   });
 
-  // TODO: Send password change notification
+  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
+    enqueueNotification(NotificationEvent.PASSWORD_CHANGED, {
+      userId: user.id,
+      email: user.email,
+      username: user.email, // email as fallback
+    });
+  }).catch(err => logger.error('Failed to enqueue password changed email', err));
   // Debug: For development
   logger.info({
     message: 'Password changed successfully',

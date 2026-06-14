@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { api } from '../../../lib/api';
 import { RegisterFormData, registerSchema } from '../../../lib/validations';
+import { useAuthStore } from '../../../store/authStore';
 
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { AuthFooter } from '@/components/layout/AuthFooter';
@@ -25,10 +26,12 @@ import { Input } from '@/components/ui/Input';
 export default function RegisterPage() {
   const router = useRouter();
   const [apiError, setApiError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      username: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -38,18 +41,54 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     setApiError('');
+    setSuccessMessage('');
     try {
-      await api.post('/auth/register', {
+      const res = await api.post('/auth/register', {
+        username: data.username,
         email: data.email,
         password: data.password,
       });
-      router.push('/login?registered=true'); // Send them to login after successful registration
+      setSuccessMessage(res.data.message || 'Registration accepted. Please check your email to verify your account.');
     } catch (err: any) {
       setApiError(
         err.response?.data?.message || 'Registration failed. Please try again.'
       );
     }
   };
+
+  if (successMessage) {
+    return (
+      <>
+        <AuthHeader />
+        <div className="bg-[#070b14] relative overflow-hidden font-sans">
+          <BackgroundRippleEffect rows={13} cols={60} />
+          <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[120px]" />
+          <div className="relative z-10 flex items-center justify-center w-full max-w-5xl mx-auto min-h-screen py-20">
+            <CardSpotlight className="group w-[440px] rounded-3xl z-20 relative" color="rgba(168,85,247,0.15)">
+              <div className="w-full h-full rounded-3xl bg-white/[0.04] backdrop-blur-3xl border border-white/[0.08] shadow-[0_0_60px_rgba(168,85,247,0.15)] p-8 relative z-20 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-purple-500/20 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-semibold text-white tracking-wide mb-4">Check Your Email</h1>
+                <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                  {successMessage}
+                </p>
+                <Button
+                  onClick={() => router.push('/login')}
+                  className="w-full rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 transition-all"
+                >
+                  Return to Login
+                </Button>
+              </div>
+            </CardSpotlight>
+          </div>
+          <AuthFooter />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -116,6 +155,23 @@ export default function RegisterPage() {
                   onSubmit={form.handleSubmit(onSubmit)}
                   className="space-y-4"
                 >
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            placeholder="Username"
+                            {...field}
+                            className="bg-white/[0.05] border-white/[0.1] rounded-xl px-4 py-6 text-sm text-white placeholder-slate-400 focus-visible:ring-purple-500/50 focus-visible:ring-offset-0 focus-visible:bg-white/[0.08] transition-all relative z-20"
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs text-red-400 ml-1 relative z-20" />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="email"

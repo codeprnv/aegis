@@ -1,27 +1,20 @@
-jest.mock('@aegis/middlewares', () => ({
-  ...jest.requireActual('@aegis/middlewares'),
-  errorMiddleware: jest.fn((err: any, req: any, res: any, next: any) => next()),
-  extractAuthContext: jest.fn((req: any, res: any, next: any) => next()),
-  requireAuth: jest.fn((req: any, res: any, next: any) => next()),
-  requireRole: jest.fn(() => (req: any, res: any, next: any) => next()),
-}));
+// Removed broken mock of @aegis/middlewares so the real auth middleware runs.
+const JWT_SECRET = 'test-jwt-secret';
+// Set env var BEFORE importing the module to fix module-level initializers
+process.env.JWT_SECRET = JWT_SECRET;
 
-const jwt = require('jsonwebtoken');
-const request = require('supertest');
+import * as jwt from 'jsonwebtoken';
+import request from 'supertest';
 import { createTestApp } from '../test-utils/test-app';
 
 describe('API Gateway Auth Contracts', () => {
   const app = createTestApp();
 
-  const JWT_SECRET = 'test-jwt-secret';
-
-  beforeAll(() => {
-    process.env.JWT_SECRET = JWT_SECRET;
-  });
-
   const createToken = (payload: { id: string; role: 'USER' | 'ADMIN' }) => {
-    return jwt.sign(payload, JWT_SECRET, {
+    return jwt.sign({ sub: payload.id, role: payload.role, type: 'access' }, JWT_SECRET, {
       expiresIn: '1h',
+      issuer: 'iam-service',
+      audience: 'aegis-client'
     });
   };
 
@@ -38,7 +31,7 @@ describe('API Gateway Auth Contracts', () => {
         .expect(200);
       expect(res.body).toEqual({
         id: 'user-1',
-        role: 'user',
+        role: 'USER',
       });
     });
   });

@@ -1,8 +1,7 @@
 import 'express';
 import type { Logger } from 'pino';
-import type { InternalTokenPayload } from '../auth/internal-token.ts';
-import type { RefreshTokenPayload } from '../auth/refresh-token.ts';
-import type { AccessTokenPayload } from '../auth/token-service.ts';
+import type { InternalTokenPayload } from '../auth/internal-token.js';
+import type { TokenPayload } from '../auth/token-service.js';
 
 declare module 'express' {
   export interface Request {
@@ -10,7 +9,7 @@ declare module 'express' {
       id: string;
       role: 'USER' | 'ADMIN';
     };
-    user?: RefreshTokenPayload | AccessTokenPayload | InternalTokenPayload;
+    user?: TokenPayload | InternalTokenPayload;
     log?: Logger;
   }
 }

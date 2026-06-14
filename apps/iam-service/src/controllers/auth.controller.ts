@@ -28,24 +28,10 @@ export const registerUserController = async (
       ipAddress: req.ip,
     });
 
-    setCookie('access_token', data.accessToken || '', res);
-    setCookie('refresh_token', data.refreshToken || '', res, {
-      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    });
-
     // Return response (controller's responsibility)
-    res.status(201).json({
+    res.status(202).json({
       success: true,
-      message: 'User registered successfully',
-      data: {
-        id: data.id,
-        username: data.username,
-        email: data.email,
-        mobile: data.mobile,
-        role: data.role,
-        createdAt: data.createdAt,
-        sessionId: data.sessionId,
-      },
+      message: data.message,
     });
   } catch (error) {
     next(error);
@@ -139,8 +125,18 @@ export const logoutController = async (
 ) => {
   try {
     const userId = req.user.sub;
-    const sessionId = req.headers['x-session-id'] as string;
+    let sessionId = req.headers['x-session-id'] as string;
     const logoutAll = req.body.logoutAll === true;
+
+    if (!sessionId && req.cookies['refresh_token']) {
+      try {
+        const { verifyRefreshToken } = require('@aegis/auth');
+        const decoded = verifyRefreshToken(req.cookies['refresh_token']);
+        sessionId = decoded.sessionId;
+      } catch (err) {
+        // Ignore if invalid/expired
+      }
+    }
 
     if (!userId) {
       throw new BadRequestError('User ID is required!');
@@ -156,6 +152,81 @@ export const logoutController = async (
       message: logoutAll
         ? 'Logged out from all devices successfully!'
         : 'Logged out successfully!',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+ * GET /me
+ * Get current user profile
+ */
+export const getMeController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const userId = req.user.sub;
+
+    if (!userId) {
+      throw new BadRequestError('User ID is required!');
+    }
+
+    const user = await authService.getMeService(userId);
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+ * GET /verify-email?token=...
+ * Verify user email address
+ */
+export const verifyEmailController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { token } = req.query;
+
+    if (!token || typeof token !== 'string') {
+      throw new BadRequestError('Invalid or missing verification token');
+    }
+
+    const data = await authService.verifyEmailService(token);
+
+    setCookie('access_token', data.accessToken || '', res);
+    setCookie('refresh_token', data.refreshToken || '', res, {
+      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      data: {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        mobile: data.mobile,
+        role: data.role,
+        createdAt: data.createdAt,
+        sessionId: data.sessionId,
+      },
     });
   } catch (error) {
     next(error);
