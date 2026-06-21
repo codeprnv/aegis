@@ -63,3 +63,10 @@ Thumbs.db
 # Next.js
 .next
 out
+
+# Markdown and Temp Files
+.agent/
+*.md
+!README.md
+*temp*.tsx
+*temp*.ts
