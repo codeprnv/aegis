@@ -59,8 +59,13 @@ export const loginUserController = async (
     });
 
     setCookie('access_token', data.accessToken || '', res);
+    
+    const refreshTokenMaxAge = validatedData.rememberMe
+      ? 30 * 24 * 60 * 60 * 1000 // 30 days
+      : 24 * 60 * 60 * 1000;     // 1 day
+
     setCookie('refresh_token', data.refreshToken || '', res, {
-      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+      maxAge: refreshTokenMaxAge,
     });
 
     res.status(200).json({

@@ -108,11 +108,14 @@ app.get('/live', (req, res) => {
   res.json({ alive: true });
 });
 
+// Version 1 API Router
+const v1Router = express.Router();
+
 // Auth Rate Limiter - 5 requests per 15 minutes (must be BEFORE proxy)
 // Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
-app.use(/^\/auth\/(login|register|reset-password|forgot-password)\/?$/i, authRateLimiter);
+v1Router.use(/^\/auth\/(login|register|reset-password|forgot-password)\/?$/i, authRateLimiter);
 
-app.use(
+v1Router.use(
   '/auth',
   createServiceProxy({
     serviceName: 'iam-service',
@@ -124,14 +127,18 @@ app.use(
       errorThreshold: 75,
     },
     proxyReqPathResolver: (req) => {
-      return `/internal/auth${req.url}`;
+      // Upstream expects /internal/v1/auth
+      return `/internal/v1/auth${req.url}`;
     },
   })
 );
 
+// Mount v1 router
+app.use('/v1', v1Router);
+
 app.use(errorMiddleware);
 
-const server = app.listen(port, () => {
+const server = app.listen(port as number, '0.0.0.0', () => {
   logger.info(`Listening at ${host}:${port}`);
 });
 server.on('error', (err) => logger.error(err));

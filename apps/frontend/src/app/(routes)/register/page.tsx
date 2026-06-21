@@ -4,9 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { api } from '../../../lib/api';
+import { registerAction } from '../../../actions/auth';    // ← Server Action
 import { RegisterFormData, registerSchema } from '../../../lib/validations';
-import { useAuthStore } from '../../../store/authStore';
 
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { AuthFooter } from '@/components/layout/AuthFooter';
@@ -42,18 +41,22 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setApiError('');
     setSuccessMessage('');
-    try {
-      const res = await api.post('/auth/register', {
-        username: data.username,
-        email: data.email,
-        password: data.password,
-      });
-      setSuccessMessage(res.data.message || 'Registration accepted. Please check your email to verify your account.');
-    } catch (err: any) {
-      setApiError(
-        err.response?.data?.message || 'Registration failed. Please try again.'
-      );
+
+    const result = await registerAction({
+      username: data.username,
+      email: data.email,
+      password: data.password,
+    });
+
+    if (!result.success) {
+      setApiError(result.error || 'Registration failed. Please try again.');
+      return;
     }
+
+    setSuccessMessage(
+      result.message ||
+        'Registration accepted. Please check your email to verify your account.'
+    );
   };
 
   if (successMessage) {
@@ -90,6 +93,7 @@ export default function RegisterPage() {
     );
   }
 
+  // ─── JSX below is UNCHANGED from the original ─────────
   return (
     <>
       <AuthHeader />

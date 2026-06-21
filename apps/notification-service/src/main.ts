@@ -19,7 +19,7 @@ app.get('/health', async (req, res) => {
 // Future: Bull Board dashboard can be mounted here
 // app.use('/admin/queues', serverAdapter.getRouter());
 
-const server = app.listen(port, () => {
+const server = app.listen(port as number, '0.0.0.0', () => {
   logger.info(`Notification Service listening on port ${port}`);
 });
 

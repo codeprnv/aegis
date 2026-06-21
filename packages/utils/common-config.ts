@@ -36,7 +36,7 @@ export const AUTH_CONFIG = {
 } as const;
 
 export const REDIS_KEYS = {
-  FAILED_ATTEMPTS: (email: string) => `auth:attempts:${email}`,
-  ACCOUNT_LOCKOUT: (email: string) => `auth:lockout:${email}`,
-  SESSION: (sessionId: string) => `session:${sessionId}`,
+  FAILED_ATTEMPTS: (email: string) => `aegis:iam:lockout:attempts:${email}`,
+  ACCOUNT_LOCKOUT: (email: string) => `aegis:iam:lockout:locked:${email}`,
+  SESSION: (sessionId: string) => `aegis:iam:session:${sessionId}`,
 } as const;

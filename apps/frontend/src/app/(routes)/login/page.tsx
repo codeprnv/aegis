@@ -15,15 +15,18 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/Input';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
-import { api } from '../../../lib/api';
+import { loginAction } from '../../../actions/auth';    // ← Server Action
 import { LoginFormData, loginSchema } from '../../../lib/validations';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [apiError, setApiError] = useState('');
+
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -36,19 +39,21 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setApiError('');
-    try {
-      await api.post('/auth/login', {
-        email: data.email,
-        password: data.password,
-      });
-      router.push('/dashboard');
-    } catch (err: any) {
-      setApiError(
-        err.response?.data?.message || 'Invalid credentials or server error.'
-      );
+    const result = await loginAction({
+      email: data.email,
+      password: data.password,
+      rememberMe: data.rememberMe,
+    });
+
+    if (!result.success) {
+      setApiError(result.error || 'Invalid credentials or server error.');
+      return;
     }
+
+    router.push(callbackUrl);
   };
 
+  // ─── JSX below is UNCHANGED from the original ─────────
   return (
     <>
       <AuthHeader />
@@ -211,5 +216,17 @@ export default function LoginPage() {
         <AuthFooter />
       </div>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#070b14] flex flex-col items-center justify-center text-white">
+        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <LoginFormContent />
+    </Suspense>
   );
 }

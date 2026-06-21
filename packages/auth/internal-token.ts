@@ -1,4 +1,4 @@
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 // Decode once at module load, reuse on every call
 const PRIVATE_KEY: string | null = process.env.INTERNAL_JWT_PRIVATE_KEY_B64

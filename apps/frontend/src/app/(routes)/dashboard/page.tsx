@@ -1,40 +1,41 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../../../store/authStore';
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { BackgroundRippleEffect } from '@/components/ui/background-ripple-effect';
-import { Button } from '@/components/ui/Button';
+import { redirect } from 'next/navigation';
+import { serverFetch } from '../../../lib/server-fetch';
+import { LogoutButton } from './LogoutButton';
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { user, isAuthenticated, isInitializing, checkAuth, logout } = useAuthStore();
-  const [mounted, setMounted] = useState(false);
+// No 'use client' — this is a Server Component!
 
-  useEffect(() => {
-    setMounted(true);
-    checkAuth();
-  }, [checkAuth]);
+interface User {
+  id: string;
+  email: string;
+  username: string;
+  mobile?: string;
+  role: 'USER' | 'ADMIN';
+  createdAt: string;
+}
 
-  useEffect(() => {
-    if (!isInitializing && !isAuthenticated) {
-      router.push('/login');
+export default async function DashboardPage() {
+  // Fetch user data directly on the server — no loading spinners needed!
+  const result = await serverFetch<{ success: boolean; user: User }>('/auth/me');
+
+  if (!result.success || !result.data?.user) {
+    if (result.status === 401 || result.status === 403) {
+      redirect('/api/auth/logout');
     }
-  }, [isInitializing, isAuthenticated, router]);
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
-  };
-
-  if (!mounted || isInitializing || !isAuthenticated) {
+    
+    // For 500s or other errors, render a fallback UI to prevent infinite redirect loops
     return (
-      <div className="min-h-screen bg-[#070b14] flex items-center justify-center text-white">
-        Loading...
+      <div className="min-h-screen flex items-center justify-center bg-[#070b14] text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error Loading Dashboard</h1>
+          <p className="text-red-400">{result.error || 'An unexpected error occurred.'}</p>
+        </div>
       </div>
     );
   }
+
+  const user = result.data.user;
 
   return (
     <div className="bg-[#070b14] relative overflow-hidden font-sans min-h-screen">
@@ -79,26 +80,22 @@ export default function DashboardPage() {
             <div className="space-y-4 mb-8">
               <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.1]">
                 <p className="text-sm text-slate-400 mb-1">Email</p>
-                <p className="text-lg text-white">{user?.email}</p>
+                <p className="text-lg text-white">{user.email}</p>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.1]">
                 <p className="text-sm text-slate-400 mb-1">Username</p>
-                <p className="text-lg text-white">{user?.username}</p>
+                <p className="text-lg text-white">{user.username}</p>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.1]">
                 <p className="text-sm text-slate-400 mb-1">Role</p>
                 <p className="text-lg text-emerald-400 font-medium">
-                  {user?.role}
+                  {user.role}
                 </p>
               </div>
             </div>
 
-            <Button
-              onClick={handleLogout}
-              className="w-full rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] py-6 text-sm font-medium text-white transition-all"
-            >
-              Logout
-            </Button>
+            {/* Logout is a client component that calls the logoutAction */}
+            <LogoutButton />
           </div>
         </CardSpotlight>
       </div>

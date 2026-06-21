@@ -67,20 +67,26 @@ app.get('/live', (req, res) => {
 });
 
 app.use('/internal', requireInternalToken('iam-service'));
-app.get('/internal/auth/health', (req, res) => {
+
+const v1Router = express.Router();
+
+v1Router.get('/auth/health', (req, res) => {
   res.send({ message: 'Welcome to iam-service!' });
 });
 
 // Auth routes
-app.use('/internal/auth', authRoutes);
+v1Router.use('/auth', authRoutes);
 
 // Admin routes
-app.use('/internal/admin', adminRoutes);
+v1Router.use('/admin', adminRoutes);
+
+// Mount v1 Router
+app.use('/internal/v1', v1Router);
 
 // Error middleware
 app.use(errorMiddleware);
 
-const server = app.listen(port, () => {
+const server = app.listen(port as number, '0.0.0.0', () => {
   logger.info(`Listening at ${host}:${port}`);
 });
 server.on('error', (err) => logger.error(err));
