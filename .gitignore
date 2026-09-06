@@ -70,3 +70,5 @@ out
 !README.md
 *temp*.tsx
 *temp*.ts
+# Agent planning docs
+.agent/docs/
