@@ -10,7 +10,9 @@ export const createRedisClient = () => {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || 'dummy-token';
 
   if (!process.env.UPSTASH_REDIS_REST_URL && process.env.NODE_ENV !== 'test') {
-    logger.warn('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables are missing');
+    logger.warn(
+      'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN environment variables are missing'
+    );
   }
 
   const redis = new Redis({

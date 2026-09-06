@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
-import { logoutAction } from '../../../actions/auth';
+import { logoutAction } from '../../../../actions/auth';
 
 export function LogoutButton() {
   return (

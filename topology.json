@@ -1,0 +1,851 @@
+{
+  "graph": {
+    "nodes": {
+      "@aegis/notification-service": {
+        "name": "@aegis/notification-service",
+        "type": "app",
+        "data": {
+          "root": "apps/notification-service",
+          "targets": {
+            "typecheck": {
+              "dependsOn": ["^typecheck"],
+              "options": {
+                "cwd": "apps\\notification-service",
+                "command": "tsc --build --emitDeclarationOnly"
+              },
+              "cache": true,
+              "inputs": [
+                "production",
+                {
+                  "dependentTasksOutputFiles": "**/*.d.ts"
+                }
+              ],
+              "outputs": [],
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "metadata": {
+                "technologies": ["typescript"],
+                "description": "Runs type-checking for the project.",
+                "help": {
+                  "command": "npx tsc --build --help",
+                  "example": {
+                    "args": ["--force"]
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "options": {
+                "cwd": "apps/notification-service",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli build"
+              },
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": [
+                "production",
+                "^production",
+                {
+                  "externalDependencies": ["webpack-cli"]
+                }
+              ],
+              "outputs": ["{workspaceRoot}/apps\\notification-service\\dist"],
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Runs Webpack build",
+                "help": {
+                  "command": "npx webpack-cli build --help",
+                  "example": {
+                    "options": {
+                      "json": "stats.json"
+                    },
+                    "args": ["--profile"]
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve": {
+              "continuous": true,
+              "executor": "@nx/js:node",
+              "defaultConfiguration": "development",
+              "dependsOn": ["build"],
+              "options": {
+                "buildTarget": "@aegis/notification-service:build",
+                "runBuildTargetDependencies": false
+              },
+              "configurations": {
+                "development": {
+                  "buildTarget": "@aegis/notification-service:build:development"
+                },
+                "production": {
+                  "buildTarget": "@aegis/notification-service:build:production"
+                }
+              },
+              "parallelism": true
+            },
+            "preview": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/notification-service",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli serve"
+              },
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Starts Webpack dev server in production mode",
+                "help": {
+                  "command": "npx webpack-cli serve --help",
+                  "example": {
+                    "options": {
+                      "args": ["--client-progress", "--history-api-fallback "]
+                    }
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "continuous": true,
+              "dependsOn": ["build"],
+              "executor": "@nx/web:file-server",
+              "options": {
+                "buildTarget": "build",
+                "spa": true
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": ["^build"],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "continuous": true,
+              "dependsOn": ["build-deps"],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npx nx watch --projects @aegis/notification-service --includeDependentProjects -- npx nx build-deps @aegis/notification-service"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "lint": {
+              "cache": true,
+              "options": {
+                "cwd": "apps/notification-service",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": ["eslint"]
+                }
+              ],
+              "outputs": ["{options.outputFile}"],
+              "metadata": {
+                "technologies": ["eslint"],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "npx eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "prune-lockfile": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "executor": "@nx/js:prune-lockfile",
+              "outputs": [
+                "{workspaceRoot}/apps/notification-service/dist/package.json",
+                "{workspaceRoot}/apps/notification-service/dist/package-lock.json"
+              ],
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "copy-workspace-modules": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "outputs": [
+                "{workspaceRoot}/apps/notification-service/dist/workspace_modules"
+              ],
+              "executor": "@nx/js:copy-workspace-modules",
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "prune": {
+              "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+              "executor": "nx:noop",
+              "configurations": {},
+              "options": {},
+              "parallelism": true
+            }
+          },
+          "projectType": "application",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@aegis/notification-service",
+              "packageVersion": "0.0.1",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "name": "@aegis/notification-service",
+          "tags": ["npm:private"],
+          "implicitDependencies": []
+        }
+      },
+      "@aegis/api-gateway": {
+        "name": "@aegis/api-gateway",
+        "type": "app",
+        "data": {
+          "root": "apps/api-gateway",
+          "targets": {
+            "typecheck": {
+              "dependsOn": ["^typecheck"],
+              "options": {
+                "cwd": "apps\\api-gateway",
+                "command": "tsc --build --emitDeclarationOnly"
+              },
+              "cache": true,
+              "inputs": [
+                "production",
+                {
+                  "dependentTasksOutputFiles": "**/*.d.ts"
+                }
+              ],
+              "outputs": [],
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "metadata": {
+                "technologies": ["typescript"],
+                "description": "Runs type-checking for the project.",
+                "help": {
+                  "command": "npx tsc --build --help",
+                  "example": {
+                    "args": ["--force"]
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "options": {
+                "cwd": "apps/api-gateway",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli build"
+              },
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": [
+                "production",
+                "^production",
+                {
+                  "externalDependencies": ["webpack-cli"]
+                }
+              ],
+              "outputs": ["{workspaceRoot}/apps\\api-gateway\\dist"],
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Runs Webpack build",
+                "help": {
+                  "command": "npx webpack-cli build --help",
+                  "example": {
+                    "options": {
+                      "json": "stats.json"
+                    },
+                    "args": ["--profile"]
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve": {
+              "continuous": true,
+              "executor": "@nx/js:node",
+              "defaultConfiguration": "development",
+              "dependsOn": ["build"],
+              "options": {
+                "buildTarget": "@aegis/api-gateway:build",
+                "runBuildTargetDependencies": false
+              },
+              "configurations": {
+                "development": {
+                  "buildTarget": "@aegis/api-gateway:build:development"
+                },
+                "production": {
+                  "buildTarget": "@aegis/api-gateway:build:production"
+                }
+              },
+              "parallelism": true
+            },
+            "preview": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/api-gateway",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli serve"
+              },
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Starts Webpack dev server in production mode",
+                "help": {
+                  "command": "npx webpack-cli serve --help",
+                  "example": {
+                    "options": {
+                      "args": ["--client-progress", "--history-api-fallback "]
+                    }
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "continuous": true,
+              "dependsOn": ["build"],
+              "executor": "@nx/web:file-server",
+              "options": {
+                "buildTarget": "build",
+                "spa": true
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": ["^build"],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "continuous": true,
+              "dependsOn": ["build-deps"],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npx nx watch --projects @aegis/api-gateway --includeDependentProjects -- npx nx build-deps @aegis/api-gateway"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "lint": {
+              "cache": true,
+              "options": {
+                "cwd": "apps/api-gateway",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": ["eslint"]
+                }
+              ],
+              "outputs": ["{options.outputFile}"],
+              "metadata": {
+                "technologies": ["eslint"],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "npx eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "executor": "@nx/jest:jest",
+              "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+              "options": {
+                "jestConfig": "apps/api-gateway/jest.config.ts"
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": ["^build"]
+            },
+            "prune-lockfile": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "executor": "@nx/js:prune-lockfile",
+              "outputs": [
+                "{workspaceRoot}/apps/api-gateway/dist/package.json",
+                "{workspaceRoot}/apps/api-gateway/dist/package-lock.json"
+              ],
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "copy-workspace-modules": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "outputs": [
+                "{workspaceRoot}/apps/api-gateway/dist/workspace_modules"
+              ],
+              "executor": "@nx/js:copy-workspace-modules",
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "prune": {
+              "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+              "executor": "nx:noop",
+              "configurations": {},
+              "options": {},
+              "parallelism": true
+            }
+          },
+          "projectType": "application",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@aegis/api-gateway",
+              "packageVersion": "0.0.1",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "name": "@aegis/api-gateway",
+          "tags": ["npm:private"],
+          "implicitDependencies": []
+        }
+      },
+      "@aegis/iam-service": {
+        "name": "@aegis/iam-service",
+        "type": "app",
+        "data": {
+          "root": "apps/iam-service",
+          "targets": {
+            "typecheck": {
+              "dependsOn": ["^typecheck"],
+              "options": {
+                "cwd": "apps\\iam-service",
+                "command": "tsc --build --emitDeclarationOnly"
+              },
+              "cache": true,
+              "inputs": [
+                "production",
+                {
+                  "dependentTasksOutputFiles": "**/*.d.ts"
+                }
+              ],
+              "outputs": [],
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "metadata": {
+                "technologies": ["typescript"],
+                "description": "Runs type-checking for the project.",
+                "help": {
+                  "command": "npx tsc --build --help",
+                  "example": {
+                    "args": ["--force"]
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "options": {
+                "cwd": "apps/iam-service",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli build"
+              },
+              "cache": true,
+              "dependsOn": ["^build"],
+              "inputs": [
+                "production",
+                "^production",
+                {
+                  "externalDependencies": ["webpack-cli"]
+                }
+              ],
+              "outputs": ["{workspaceRoot}/apps\\iam-service\\dist"],
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Runs Webpack build",
+                "help": {
+                  "command": "npx webpack-cli build --help",
+                  "example": {
+                    "options": {
+                      "json": "stats.json"
+                    },
+                    "args": ["--profile"]
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve": {
+              "continuous": true,
+              "executor": "@nx/js:node",
+              "defaultConfiguration": "development",
+              "dependsOn": ["build"],
+              "options": {
+                "buildTarget": "@aegis/iam-service:build",
+                "runBuildTargetDependencies": false
+              },
+              "configurations": {
+                "development": {
+                  "buildTarget": "@aegis/iam-service:build:development"
+                },
+                "production": {
+                  "buildTarget": "@aegis/iam-service:build:production"
+                }
+              },
+              "parallelism": true
+            },
+            "preview": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/iam-service",
+                "args": ["--node-env=production"],
+                "command": "webpack-cli serve"
+              },
+              "metadata": {
+                "technologies": ["webpack"],
+                "description": "Starts Webpack dev server in production mode",
+                "help": {
+                  "command": "npx webpack-cli serve --help",
+                  "example": {
+                    "options": {
+                      "args": ["--client-progress", "--history-api-fallback "]
+                    }
+                  }
+                }
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "continuous": true,
+              "dependsOn": ["build"],
+              "executor": "@nx/web:file-server",
+              "options": {
+                "buildTarget": "build",
+                "spa": true
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": ["^build"],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "continuous": true,
+              "dependsOn": ["build-deps"],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npx nx watch --projects @aegis/iam-service --includeDependentProjects -- npx nx build-deps @aegis/iam-service"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "lint": {
+              "cache": true,
+              "options": {
+                "cwd": "apps/iam-service",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/apps/iam-service/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": ["eslint"]
+                }
+              ],
+              "outputs": ["{options.outputFile}"],
+              "metadata": {
+                "technologies": ["eslint"],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "npx eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "test": {
+              "metadata": {
+                "technologies": ["jest"],
+                "description": "Run Jest Tests",
+                "help": {
+                  "command": "npx jest --help",
+                  "example": {
+                    "options": {
+                      "coverage": true
+                    }
+                  }
+                }
+              },
+              "cache": true,
+              "inputs": [
+                "default",
+                "^production",
+                "{workspaceRoot}\\jest.preset.cjs",
+                {
+                  "externalDependencies": ["jest"]
+                }
+              ],
+              "outputs": ["{workspaceRoot}\\coverage\\apps\\iam-service"],
+              "executor": "nx:run-commands",
+              "options": {
+                "cwd": "apps/iam-service",
+                "env": {
+                  "TS_NODE_COMPILER_OPTIONS": "{\"moduleResolution\":\"node10\",\"module\":\"commonjs\",\"customConditions\":null}"
+                },
+                "command": "jest",
+                "passWithNoTests": true
+              },
+              "configurations": {},
+              "parallelism": true,
+              "dependsOn": ["^build"]
+            },
+            "prune-lockfile": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "executor": "@nx/js:prune-lockfile",
+              "outputs": [
+                "{workspaceRoot}/apps/iam-service/dist/package.json",
+                "{workspaceRoot}/apps/iam-service/dist/package-lock.json"
+              ],
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "copy-workspace-modules": {
+              "dependsOn": ["build"],
+              "cache": true,
+              "outputs": [
+                "{workspaceRoot}/apps/iam-service/dist/workspace_modules"
+              ],
+              "executor": "@nx/js:copy-workspace-modules",
+              "options": {
+                "buildTarget": "build"
+              },
+              "configurations": {},
+              "parallelism": true
+            },
+            "prune": {
+              "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
+              "executor": "nx:noop",
+              "configurations": {},
+              "options": {},
+              "parallelism": true
+            }
+          },
+          "projectType": "application",
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@aegis/iam-service",
+              "packageVersion": "0.0.1",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "name": "@aegis/iam-service",
+          "tags": ["npm:private"],
+          "implicitDependencies": []
+        }
+      },
+      "@aegis/frontend": {
+        "name": "@aegis/frontend",
+        "type": "app",
+        "data": {
+          "root": "apps/frontend",
+          "targets": {
+            "lint": {
+              "cache": true,
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "eslint ."
+              },
+              "inputs": [
+                "default",
+                "^default",
+                "{workspaceRoot}/eslint.config.mjs",
+                "{workspaceRoot}/tools/eslint-rules/**/*",
+                {
+                  "externalDependencies": ["eslint"]
+                }
+              ],
+              "outputs": ["{options.outputFile}"],
+              "metadata": {
+                "technologies": ["eslint"],
+                "description": "Runs ESLint on project",
+                "help": {
+                  "command": "npx eslint --help",
+                  "example": {
+                    "options": {
+                      "max-warnings": 0
+                    }
+                  }
+                }
+              },
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build": {
+              "options": {
+                "cwd": "apps/frontend",
+                "tty": false,
+                "command": "next build"
+              },
+              "dependsOn": ["^build"],
+              "cache": true,
+              "inputs": [
+                "default",
+                "^production",
+                {
+                  "externalDependencies": ["next"]
+                }
+              ],
+              "outputs": [
+                "{workspaceRoot}/apps/frontend/.next/!(cache)/**/*",
+                "{workspaceRoot}/apps/frontend/.next/!(cache)"
+              ],
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "dev": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "next dev"
+              },
+              "syncGenerators": ["@nx/js:typescript-sync"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "start": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "next start"
+              },
+              "dependsOn": ["build"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "serve-static": {
+              "continuous": true,
+              "options": {
+                "cwd": "apps/frontend",
+                "command": "next start"
+              },
+              "dependsOn": ["build"],
+              "executor": "nx:run-commands",
+              "configurations": {},
+              "parallelism": true
+            },
+            "build-deps": {
+              "dependsOn": ["^build"],
+              "configurations": {},
+              "options": {},
+              "parallelism": true,
+              "executor": "nx:noop"
+            },
+            "watch-deps": {
+              "continuous": true,
+              "dependsOn": ["build-deps"],
+              "executor": "nx:run-commands",
+              "options": {
+                "command": "npx nx watch --projects @aegis/frontend --includeDependentProjects -- npx nx build-deps @aegis/frontend"
+              },
+              "configurations": {},
+              "parallelism": true
+            }
+          },
+          "name": "@aegis/frontend",
+          "tags": ["npm:private"],
+          "metadata": {
+            "targetGroups": {},
+            "js": {
+              "packageName": "@aegis/frontend",
+              "packageVersion": "0.0.1",
+              "isInPackageManagerWorkspaces": true
+            }
+          },
+          "implicitDependencies": []
+        }
+      }
+    },
+    "dependencies": {
+      "@aegis/notification-service": [],
+      "@aegis/api-gateway": [],
+      "@aegis/iam-service": [],
+      "@aegis/frontend": []
+    }
+  }
+}

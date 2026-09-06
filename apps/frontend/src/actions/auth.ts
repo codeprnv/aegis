@@ -174,3 +174,125 @@ export async function logoutAction(): Promise<void> {
 
   redirect('/login');
 }
+
+/**
+ * Initiates the forget password flow by requesting the OTP
+ */
+
+export async function forgotPasswordAction(formData: {
+  email: string;
+}): Promise<AuthActionResult> {
+  try {
+    const correlationId = await getCorrelationId();
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-ID': correlationId,
+      },
+      body: JSON.stringify(formData),
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.message || 'Failed to process forgot password request',
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'OTP sent to email if registered',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'An unexpected error occurred. Please try again',
+    };
+  }
+}
+
+/**
+ * Resets the user's password using the provided OTP
+ */
+export async function resetPasswordAction(formData: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}): Promise<AuthActionResult> {
+  try {
+    const correlationId = await getCorrelationId();
+
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-ID': correlationId,
+      },
+      body: JSON.stringify(formData),
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.message || 'Failed to process reset password request',
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Password reset successful',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'An unexpected error occurred. Please try again',
+    };
+  }
+}
+
+/**
+ * Requests a new verification email for an unverified account
+ */
+export async function resendVerificationAction(formData: {
+  email: string;
+}): Promise<AuthActionResult> {
+  try {
+    const correlationId = await getCorrelationId();
+
+    const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Correlation-ID': correlationId,
+      },
+      body: JSON.stringify(formData),
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.message || 'Failed to resend verification email.',
+      };
+    }
+
+    return {
+      success: true,
+      message: data.message || 'Verification email sent.',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'An unexpected error occurred. Please try again.',
+    };
+  }
+}

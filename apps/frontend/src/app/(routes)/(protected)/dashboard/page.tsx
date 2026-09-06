@@ -1,10 +1,7 @@
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { BackgroundRippleEffect } from '@/components/ui/background-ripple-effect';
-import { redirect } from 'next/navigation';
-import { serverFetch } from '../../../lib/server-fetch';
+import { serverFetch } from '@/lib/server-fetch';
 import { LogoutButton } from './LogoutButton';
-
-// No 'use client' — this is a Server Component!
 
 interface User {
   id: string;
@@ -15,18 +12,16 @@ interface User {
   createdAt: string;
 }
 
+/**
+ * Dashboard page displaying the authenticated user's profile information.
+ * Session validation is handled by the (protected) layout.
+ */
 export default async function DashboardPage() {
-  // Fetch user data directly on the server — no loading spinners needed!
   const result = await serverFetch<{ success: boolean; user: User }>('/auth/me');
 
   if (!result.success || !result.data?.user) {
-    if (result.status === 401 || result.status === 403) {
-      redirect('/api/auth/logout');
-    }
-    
-    // For 500s or other errors, render a fallback UI to prevent infinite redirect loops
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#070b14] text-white">
+      <div className="flex items-center justify-center min-h-screen text-white">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Error Loading Dashboard</h1>
           <p className="text-red-400">{result.error || 'An unexpected error occurred.'}</p>
@@ -38,7 +33,7 @@ export default async function DashboardPage() {
   const user = result.data.user;
 
   return (
-    <div className="bg-[#070b14] relative overflow-hidden font-sans min-h-screen">
+    <>
       <BackgroundRippleEffect rows={13} cols={60} />
       <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[120px]" />
 
@@ -94,11 +89,10 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            {/* Logout is a client component that calls the logoutAction */}
             <LogoutButton />
           </div>
         </CardSpotlight>
       </div>
-    </div>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { requireInternalToken } from '@aegis/middlewares';
 import express, { type Router } from 'express';
 import * as authController from '../controllers/auth.controller';
+import * as resendController from '../controllers/auth.controller.resend-verification';
 import * as passwordController from '../controllers/password.controller';
 import {
   forgotPasswordRateLimiter,
@@ -24,9 +25,22 @@ router.post(
   refreshRateLimiter,
   authController.refreshTokenController
 );
-router.post('/logout', requireInternalToken('iam-service'), authController.logoutController);
-router.get('/me', requireInternalToken('iam-service'), authController.getMeController);
+router.post(
+  '/logout',
+  requireInternalToken('iam-service'),
+  authController.logoutController
+);
+router.get(
+  '/me',
+  requireInternalToken('iam-service'),
+  authController.getMeController
+);
 router.get('/verify-email', authController.verifyEmailController);
+router.post(
+  '/resend-verification',
+  registerRateLimiter,
+  resendController.resendVerificationController
+);
 
 // Password management routes (unauthenticated)
 router.post(

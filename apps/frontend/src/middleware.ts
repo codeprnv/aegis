@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const PROTECTED_ROUTES = ['/dashboard'];
+const PROTECTED_ROUTES = ['/dashboard', '/profile', '/sessions', '/settings'];
 
-const AUTH_ROUTES = ['/login', '/register'];
+const AUTH_ROUTES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,9 +24,11 @@ export function middleware(request: NextRequest) {
     try {
       // JWT is header.payload.signature
       const payloadBase64 = token.split('.')[1];
-      const decodedJson = atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'));
+      const decodedJson = atob(
+        payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+      );
       const payload = JSON.parse(decodedJson);
-      
+
       // If there's no exp claim, consider it valid. If exp is past current time, it's expired.
       if (!payload.exp) return false;
       return Date.now() >= payload.exp * 1000;
@@ -31,7 +38,8 @@ export function middleware(request: NextRequest) {
   };
 
   // User has a session if at least one token exists AND is not expired
-  const hasSession = !isTokenExpired(accessToken) || !isTokenExpired(refreshToken);
+  const hasSession =
+    !isTokenExpired(accessToken) || !isTokenExpired(refreshToken);
 
   const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
     pathname.startsWith(route)
