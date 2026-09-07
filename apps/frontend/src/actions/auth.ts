@@ -11,6 +11,8 @@ export interface AuthActionResult {
   success: boolean;
   message?: string;
   error?: string;
+  requiresEmailVerification?: boolean;
+  requiresPasswordChange?: boolean;
 }
 
 /**
@@ -38,9 +40,24 @@ export async function loginAction(formData: {
     const data = await response.json();
 
     if (!response.ok) {
+      const isEmailNotVerified =
+        response.status === 403 &&
+        typeof data.message === 'string' &&
+        data.message.toLowerCase().includes('verify your email');
+
       return {
         success: false,
         error: data.message || 'Invalid credentials or server error.',
+        requiresEmailVerification: isEmailNotVerified,
+      };
+    }
+
+    if (data.requiresPasswordChange) {
+      return {
+        success: false,
+        message: data.message || 'Temporary password must be changed.',
+        error: data.message || 'Please change your temporary password to continue.',
+        requiresPasswordChange: true,
       };
     }
 

@@ -40,4 +40,5 @@ export interface AuthResponse {
   createdAt?: Date;
   sessionId?: string;
   message?: string;
+  requiresPasswordChange?: boolean;
 }

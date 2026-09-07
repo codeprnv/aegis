@@ -18,6 +18,7 @@ export const changePassword = async (
     select: {
       id: true,
       email: true,
+      username: true,
       passwordHash: true,
     },
   });
@@ -77,7 +78,7 @@ export const changePassword = async (
     enqueueNotification(NotificationEvent.PASSWORD_CHANGED, {
       userId: user.id,
       email: user.email,
-      username: user.email, // email as fallback
+      username: user.username, // actual username
     });
   }).catch(err => logger.error('Failed to enqueue password changed email', err));
   // Debug: For development

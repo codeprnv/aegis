@@ -7,7 +7,10 @@
     "build": "nx run-many --target=build --all --verbose",
     "backend": "nx run-many --target=serve --all --watch",
     "frontend": "cd apps/frontend && npx next dev",
-    "test": "npx jest"
+    "test": "npx jest",
+    "prisma:generate:iam": "prisma generate --schema=prisma/iam-service/schema.prisma",
+    "prisma:generate:notification": "prisma generate --schema=prisma/notification-service/schema.prisma",
+    "prisma:generate": "npm run prisma:generate:iam && npm run prisma:generate:notification"
   },
   "private": true,
   "dependencies": {

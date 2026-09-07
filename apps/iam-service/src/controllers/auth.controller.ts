@@ -56,12 +56,13 @@ export const loginUserController = async (
       password: validatedData.password,
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
+      rememberMe: validatedData.rememberMe,
     });
 
     setCookie('access_token', data.accessToken || '', res);
     
     const refreshTokenMaxAge = validatedData.rememberMe
-      ? 30 * 24 * 60 * 60 * 1000 // 30 days
+      ? 15 * 24 * 60 * 60 * 1000 // 15 days
       : 24 * 60 * 60 * 1000;     // 1 day
 
     setCookie('refresh_token', data.refreshToken || '', res, {
@@ -135,7 +136,7 @@ export const logoutController = async (
 
     if (!sessionId && req.cookies['refresh_token']) {
       try {
-        const { verifyRefreshToken } = require('@aegis/auth');
+        const { verifyRefreshToken } = await import('@aegis/auth');
         const decoded = verifyRefreshToken(req.cookies['refresh_token']);
         sessionId = decoded.sessionId;
       } catch (err) {

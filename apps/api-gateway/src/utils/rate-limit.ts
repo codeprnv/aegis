@@ -30,12 +30,12 @@ export const authRateLimiter = rateLimit({
     sendCommand: (...args: string[]) => redisClient.call(...args),
     prefix: 'aegis:gateway:rl:auth:',
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.WINDOW_MS, // 15 min
-  max: AUTH_CONFIG.RATE_LIMIT.AUTH_MAX_REQUESTS, // 5 requests
+  windowMs: 60 * 1000,
+  max: 50,
   message: {
     status: 'error',
     statusCode: 429,
-    message: 'Too many login attempts, please try again later!',
+    message: 'Too many requests to authentication endpoints. Please try again later.',
   },
   legacyHeaders: true,
   keyGenerator: (req) => {

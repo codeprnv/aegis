@@ -15,5 +15,6 @@ export const setCookie = (
     secure: options?.secure ?? process.env.NODE_ENV === 'production',
     sameSite: options?.sameSite ?? 'strict',
     maxAge: options?.maxAge ?? 15 * 60 * 1000,
+    path: '/',
   });
 };

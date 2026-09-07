@@ -1,7 +1,6 @@
 process.env.SERVICE_NAME = 'api-gateway';
 
 import { apiGatewayEnvSchema } from '@aegis/types';
-// import { id } from 'cls-rtracer';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 
@@ -66,9 +65,13 @@ app.use(
   })
 );
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((item) => item.trim())
+  : [origin];
+
 app.use(
   cors({
-    origin: [origin],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'authorization'],
@@ -80,7 +83,6 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 app.use(extractAuthContext);
-app.set('trust proxy', 1);
 
 // General Rate Limiter - 50 request per 15 minutes
 app.use(rateLimiter);
@@ -111,7 +113,7 @@ app.get('/live', (req, res) => {
 // Version 1 API Router
 const v1Router = express.Router();
 
-// Auth Rate Limiter - 5 requests per 15 minutes (must be BEFORE proxy)
+// Auth Rate Limiter - DDoS protection (must be BEFORE proxy)
 // Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
 v1Router.use(/^\/auth\/(login|register|reset-password|forgot-password)\/?$/i, authRateLimiter);
 
@@ -129,6 +131,24 @@ v1Router.use(
     proxyReqPathResolver: (req) => {
       // Upstream expects /internal/v1/auth
       return `/internal/v1/auth${req.url}`;
+    },
+  })
+);
+
+v1Router.use(
+  '/admin',
+  createServiceProxy({
+    serviceName: 'iam-service',
+    serviceUrl: `${host}:${iamServicePort}`,
+    timeout: 5000,
+    circuitBreaker: {
+      enabled: true,
+      resetTimeout: 20000,
+      errorThreshold: 75,
+    },
+    proxyReqPathResolver: (req) => {
+      // Upstream expects /internal/v1/admin
+      return `/internal/v1/admin${req.url}`;
     },
   })
 );

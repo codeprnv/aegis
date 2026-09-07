@@ -1,4 +1,5 @@
 import { logger } from '@aegis/common';
+import { notificationPrisma } from '@aegis/database';
 import { createBullMQConnection } from '@aegis/events';
 import { Job, Worker } from 'bullmq';
 import { sendEmail } from '../channels/email.channel';
@@ -13,10 +14,8 @@ export const startEmailWorker = (): Worker => {
       logger.info(`Processing job ${job.id} (Event: ${job.name})`);
 
       try {
-        const { prisma } = require('@aegis/database');
-
         // Idempotency: Check if job is already processed
-        const existingNotification = await prisma.notification.findUnique({
+        const existingNotification = await notificationPrisma.notification.findUnique({
           where: { idempotencyKey: job.id! },
         });
 
@@ -28,7 +27,7 @@ export const startEmailWorker = (): Worker => {
         let notificationId = existingNotification?.id;
 
         if (!existingNotification) {
-          const newNotif = await prisma.notification.create({
+          const newNotif = await notificationPrisma.notification.create({
             data: {
               eventType: job.name,
               recipientId: job.data.userId || 'unknown',
@@ -41,7 +40,7 @@ export const startEmailWorker = (): Worker => {
           });
           notificationId = newNotif.id;
         } else {
-          await prisma.notification.update({
+          await notificationPrisma.notification.update({
             where: { id: existingNotification.id },
             data: {
               attempts: { increment: 1 },
@@ -53,7 +52,7 @@ export const startEmailWorker = (): Worker => {
         // Dispatch to email channel
         const providerMessageId = await sendEmail(job.name, job.data);
 
-        await prisma.notification.update({
+        await notificationPrisma.notification.update({
           where: { id: notificationId },
           data: {
             status: 'sent',
@@ -66,9 +65,8 @@ export const startEmailWorker = (): Worker => {
       } catch (error: any) {
         logger.error(`Failed to process job ${job.id}: ${error.message}`);
 
-        const { prisma } = require('@aegis/database');
         // Log failure
-        await prisma.notification.update({
+        await notificationPrisma.notification.update({
           where: { idempotencyKey: job.id! },
           data: {
             status: 'failed',

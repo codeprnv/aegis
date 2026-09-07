@@ -6,13 +6,13 @@ export async function cleanupExpiredSessions() {
   try {
     const cutOfDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 Days
 
-    // Delete expired sessions
+    // Delete sessions expired or revoked for more than 30 days
     const expiredResult = await prisma.session.deleteMany({
       where: {
         OR: [
-          { expiresAt: { lt: new Date() } },
+          { expiresAt: { lt: cutOfDate } },
           {
-            revokedAt: { not: null, lt: cutOfDate }, // Revoked in last 30 days,
+            revokedAt: { not: null, lt: cutOfDate },
           },
         ],
       },

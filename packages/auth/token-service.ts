@@ -49,11 +49,12 @@ export const verifyAccessToken = (
 export const generateRefreshToken = (
   payload: TokenPayload,
   issuer = 'iam-service',
-  audience = 'aegis-client'
+  audience = 'aegis-client',
+  expiresIn = REFRESH_TOKEN_EXPIRY
 ) => {
   if (!payload) throw new BadRequestError('Invalid Payload!');
   return jwt.sign({ ...payload, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
-    expiresIn: REFRESH_TOKEN_EXPIRY,
+    expiresIn: expiresIn,
     issuer: issuer,
     audience: audience,
   });

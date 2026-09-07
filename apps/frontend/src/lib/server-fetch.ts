@@ -6,6 +6,7 @@
 // ============================================================
 
 
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { buildCookieHeader } from './cookie-utils';
 import { getCorrelationId } from './request-context';
@@ -41,9 +42,16 @@ export async function serverFetch<T = unknown>(
   const response = await fetch(url, fetchOptions);
 
   if (response.status === 401) {
-    // We cannot refresh and mutate cookies inside a Server Component fetch.
-    // Instead, redirect to the Route Handler which CAN mutate cookies.
-    redirect('/api/auth/refresh');
+    // Check if a refresh token actually exists in cookies before redirecting to refresh route.
+    // If no refresh token exists, redirecting to refresh will fail and loop; send directly to login.
+    const cookieStore = await cookies();
+    const hasRefreshToken = Boolean(cookieStore.get('refresh_token')?.value);
+
+    if (hasRefreshToken) {
+      redirect('/api/auth/refresh');
+    }
+
+    redirect('/login');
   }
 
   try {

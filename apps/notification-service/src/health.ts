@@ -23,8 +23,8 @@ export const checkHealth = async () => {
     }
 
     // Check Postgres Database Connection
-    const { prisma } = require('@aegis/database');
-    await prisma.$queryRaw`SELECT 1`;
+    const { notificationPrisma } = await import('@aegis/database');
+    await notificationPrisma.$queryRaw`SELECT 1`;
     status.database = 'connected';
 
   } catch (error: any) {

@@ -70,5 +70,9 @@ out
 !README.md
 *temp*.tsx
 *temp*.ts
+temp/
 # Agent planning docs
 .agent/docs/
+
+# IDE/Tools
+topology.json

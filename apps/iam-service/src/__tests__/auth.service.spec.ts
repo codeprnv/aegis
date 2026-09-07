@@ -60,6 +60,7 @@ describe('Auth Service - loginUser', () => {
     mobile: '1234567890',
     passwordHash: 'hashed-password',
     createdAt: new Date(),
+    emailVerified: true,
   };
 
   beforeEach(() => {

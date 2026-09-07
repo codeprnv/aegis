@@ -17,7 +17,7 @@ import {
   ForbiddenError,
   UnauthorizedError,
 } from '@aegis/middlewares';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { UAParser } from 'ua-parser-js';
 import type {
   AuthResponse,
@@ -54,22 +54,22 @@ export const registerUser = async (
     );
   }
 
-  // Check if user is already pending in Redis
-  const pendingKeys = await redis.keys('registration:*');
-  for (const key of pendingKeys) {
-    const pendingData = await redis.get<any>(key);
-    if (pendingData && (pendingData.email === email || pendingData.username === username)) {
-      throw new ConflictError(
-        'A user with this email or username is already pending verification. Please check your email.'
-      );
-    }
+  // Check if user is already pending in Redis using secondary indexes
+  const pendingByEmail = await redis.get(`registration:email:${email}`);
+  const pendingByUsername = await redis.get(`registration:username:${username}`);
+  
+  if (pendingByEmail || pendingByUsername) {
+    throw new ConflictError(
+      'A user with this email or username is already pending verification. Please check your email.'
+    );
   }
 
   // Hash the password
   const passwordHash = await hashPassword(password);
 
-  // Generate a verification token
-  const emailVerificationToken = randomUUID();
+  // Generate a random verification token and hash it for secure storage
+  const rawVerificationToken = randomBytes(32).toString('hex');
+  const tokenHash = hashTokenSHA256(rawVerificationToken);
 
   const pendingUserData = {
     username,
@@ -80,20 +80,22 @@ export const registerUser = async (
     ipAddress,
   };
 
-  // Store in Redis with a 24-hour expiration (86400 seconds)
-  await redis.setex(`registration:${emailVerificationToken}`, 86400, pendingUserData);
+  // Store in Redis with a 24-hour expiration (86400 seconds) using the token hash
+  await redis.setex(`registration:${tokenHash}`, 86400, pendingUserData);
+  await redis.setex(`registration:email:${email}`, 86400, tokenHash);
+  await redis.setex(`registration:username:${username}`, 86400, tokenHash);
 
   // Enqueue emails asynchronously (don't block the request)
   import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
-    // We only send the Verification Email at this stage
+    // We only send the Verification Email at this stage with the raw token
     enqueueNotification(NotificationEvent.EMAIL_VERIFICATION_REQUESTED, {
       userId: 'pending',
       email: email,
       username: username,
-      verificationToken: emailVerificationToken,
+      verificationToken: rawVerificationToken,
     });
   }).catch((err) => {
-    console.error('Failed to enqueue registration emails', err);
+    logger.error(err, 'Failed to enqueue registration emails');
   });
 
   return {
@@ -102,7 +104,8 @@ export const registerUser = async (
 };
 
 export const verifyEmailService = async (token: string): Promise<AuthResponse> => {
-  const redisKey = `registration:${token}`;
+  const tokenHash = hashTokenSHA256(token);
+  const redisKey = `registration:${tokenHash}`;
   const pendingData = await redis.get<any>(redisKey);
 
   if (!pendingData) {
@@ -210,6 +213,8 @@ export const verifyEmailService = async (token: string): Promise<AuthResponse> =
 
   // Delete the pending registration from Redis
   await redis.del(redisKey);
+  await redis.del(`registration:email:${pendingData.email}`);
+  await redis.del(`registration:username:${pendingData.username}`);
 
   // Welcome email can be sent here if we didn't send it before
   import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
@@ -219,7 +224,7 @@ export const verifyEmailService = async (token: string): Promise<AuthResponse> =
       username: user.username,
     });
   }).catch((err) => {
-    console.error('Failed to enqueue welcome email', err);
+    logger.error(err, 'Failed to enqueue welcome email');
   });
 
   return {
@@ -231,7 +236,7 @@ export const verifyEmailService = async (token: string): Promise<AuthResponse> =
 };
 
 export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
-  const { email, password, userAgent, ipAddress } = input;
+  const { email, password, userAgent, ipAddress, rememberMe } = input;
 
   const { locked, reason } = await isAccountLocked(email);
   if (locked) {
@@ -246,7 +251,8 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       username: true,
       mobile: true,
       role: true,
-      createdAt: true,
+      emailVerified: true,
+      forcePasswordChange: true,
       passwordHash: true,
     },
   });
@@ -254,6 +260,10 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
   if (!user || !user.passwordHash) {
     await recordFailedAttempt(email, ipAddress);
     throw new UnauthorizedError('Invalid email or password');
+  }
+
+  if (!user.emailVerified) {
+    throw new ForbiddenError('Please verify your email address before logging in.');
   }
 
   const isValidPassword = await verifyPassword(password, user.passwordHash);
@@ -268,6 +278,13 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     throw new UnauthorizedError(
       `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
     );
+  }
+
+  if (user.forcePasswordChange) {
+    return {
+      requiresPasswordChange: true,
+      message: 'You must change your temporary password before continuing.',
+    };
   }
 
   const parser = new UAParser(userAgent || '');
@@ -288,6 +305,9 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     'aegis-client'
   );
 
+  const refreshExpiryDays = rememberMe ? 15 : 1;
+  const refreshExpiryStr = `${refreshExpiryDays}d`;
+  
   const refreshToken = generateRefreshToken(
     {
       sub: user.id,
@@ -296,12 +316,13 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       sessionId: sessionId,
     },
     'iam-service',
-    'aegis-client'
+    'aegis-client',
+    refreshExpiryStr
   );
 
   const refreshTokenHash = hashTokenSHA256(refreshToken);
   const expiresAt = new Date(
-    Date.now() + AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000
+    Date.now() + refreshExpiryDays * 24 * 60 * 60 * 1000
   );
 
   // Execute login transactionally
@@ -471,6 +492,11 @@ export const refreshTokenService = async (
       throw new UnauthorizedError('Refresh token reuse detected!');
     }
 
+    await tx.user.update({
+      where: { id: user.id },
+      data: { lastActiveAt: new Date() },
+    });
+
     await tx.session.create({
       data: {
         id: newSessionId,
@@ -518,6 +544,7 @@ export const logoutService = async (
     await prisma.session.updateMany({
       where: {
         id: sessionId,
+        userId: userId,
       },
       data: {
         revokedAt: new Date(),
@@ -528,17 +555,20 @@ export const logoutService = async (
 };
 
 export const getMeService = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      mobile: true,
-      role: true,
-      createdAt: true,
-    },
-  });
+  const user = await prisma.user
+    .update({
+      where: { id: userId },
+      data: { lastActiveAt: new Date() },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        mobile: true,
+        role: true,
+        createdAt: true,
+      },
+    })
+    .catch(() => null);
 
   if (!user) {
     throw new UnauthorizedError('User not found!');

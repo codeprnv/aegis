@@ -1,6 +1,7 @@
 import {
   AUTH_CONFIG,
   hashPassword,
+  hashTokenSHA256,
   logger,
   validatePassword,
   verifyPassword,
@@ -34,8 +35,8 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   // Generate OTP and token
   const otp = generateOTP();
   const token = randomBytes(32).toString('hex');
-  const otpHash = await hashPassword(otp); // Hash the otp
-  const tokenHash = await hashPassword(token); // Hash the token
+  const otpHash = hashTokenSHA256(otp); // Hash the otp
+  const tokenHash = hashTokenSHA256(token); // Hash the token
 
   const otpExpiry = new Date(
     Date.now() + AUTH_CONFIG.OTP_EXPIRY_MINUTES * 60 * 1000
@@ -92,7 +93,7 @@ export const resetPasswordWithOTP = async (
   // Find user
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true },
+    select: { id: true, email: true, username: true },
   });
 
   if (!user) {
@@ -128,7 +129,7 @@ export const resetPasswordWithOTP = async (
   }
 
   // Verify OTP
-  const isValidOTP = await verifyPassword(otp, passwordResetRequest.otpHash);
+  const isValidOTP = hashTokenSHA256(otp) === passwordResetRequest.otpHash;
 
   if (!isValidOTP) {
     // Increment the attempts
@@ -191,7 +192,7 @@ export const resetPasswordWithOTP = async (
     enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
       userId: user.id,
       email: user.email,
-      username: user.email, // using email as fallback if username isn't queried
+      username: user.username, // using actual username
     });
   }).catch(err => logger.error('Failed to enqueue password reset confirmation email', err));
 
@@ -226,10 +227,7 @@ export const resetPasswordWithToken = async (
   }
 
   // Verify token
-  const isValidToken = await verifyPassword(
-    token,
-    passwordResetRequest.tokenHash
-  );
+  const isValidToken = hashTokenSHA256(token) === passwordResetRequest.tokenHash;
 
   if (!isValidToken) {
     throw new UnauthorizedError('Invalid or expired reset link!');
@@ -286,6 +284,5 @@ export const resetPasswordWithToken = async (
     userId: passwordResetRequest.userId,
     email: passwordResetRequest.user.email,
     resetId: resetId,
-    token: token,
   });
 };
