@@ -15,6 +15,23 @@ export interface AuthActionResult {
   requiresPasswordChange?: boolean;
 }
 
+interface ApiErrorResponse {
+  message?: string;
+  errors?: Array<{ field?: string; message?: string }>;
+}
+
+/**
+ * Extracts a concise error message from an API Gateway error response.
+ * Handles Zod validation error arrays as well as standard error envelopes.
+ */
+function extractErrorMessage(data: unknown, fallback: string): string {
+  const err = data as ApiErrorResponse | undefined;
+  if (Array.isArray(err?.errors) && err.errors.length > 0) {
+    return err.errors[0]?.message || fallback;
+  }
+  return err?.message || fallback;
+}
+
 /**
  * Authenticates a user with the API Gateway and establishes a secure session.
  * Automatically propagates HTTP-only cookies to the Next.js context upon success.
@@ -47,7 +64,7 @@ export async function loginAction(formData: {
 
       return {
         success: false,
-        error: data.message || 'Invalid credentials or server error.',
+        error: extractErrorMessage(data, 'Invalid credentials or server error.'),
         requiresEmailVerification: isEmailNotVerified,
       };
     }
@@ -65,7 +82,7 @@ export async function loginAction(formData: {
     await propagateCookies(response);
 
     return { success: true, message: 'Login successful' };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again.',
@@ -100,7 +117,7 @@ export async function registerAction(formData: {
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || 'Registration failed. Please try again.',
+        error: extractErrorMessage(data, 'Registration failed. Please try again.'),
       };
     }
 
@@ -110,7 +127,7 @@ export async function registerAction(formData: {
         data.message ||
         'Registration accepted. Please check your email to verify your account.',
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again.',
@@ -216,7 +233,10 @@ export async function forgotPasswordAction(formData: {
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || 'Failed to process forgot password request',
+        error: extractErrorMessage(
+          data,
+          'Failed to process forgot password request'
+        ),
       };
     }
 
@@ -224,7 +244,7 @@ export async function forgotPasswordAction(formData: {
       success: true,
       message: data.message || 'OTP sent to email if registered',
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again',
@@ -258,7 +278,10 @@ export async function resetPasswordAction(formData: {
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || 'Failed to process reset password request',
+        error: extractErrorMessage(
+          data,
+          'Failed to process reset password request'
+        ),
       };
     }
 
@@ -266,7 +289,7 @@ export async function resetPasswordAction(formData: {
       success: true,
       message: data.message || 'Password reset successful',
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again',
@@ -298,7 +321,10 @@ export async function resendVerificationAction(formData: {
     if (!response.ok) {
       return {
         success: false,
-        error: data.message || 'Failed to resend verification email.',
+        error: extractErrorMessage(
+          data,
+          'Failed to resend verification email.'
+        ),
       };
     }
 
@@ -306,7 +332,7 @@ export async function resendVerificationAction(formData: {
       success: true,
       message: data.message || 'Verification email sent.',
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred. Please try again.',

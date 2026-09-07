@@ -2,13 +2,13 @@ import { id } from 'cls-rtracer';
 import { NextFunction, Request, Response } from 'express';
 import proxy from 'express-http-proxy';
 import CircuitBreaker from 'opossum';
-import { generateInternalToken } from '../auth/internal-token.js';
+import { generateInternalToken, type InternalTokenPayload } from '../auth/internal-token.js';
 import { logger } from '../utils/logger.js';
 
 interface ServiceProxyOptions {
-  serviceName: string; //name of internal token audience
-  serviceUrl: string; // target service url
-  timeout?: number; // timeout for the request (default: 5000ms)
+  serviceName: string; // Target service name for internal token audience
+  serviceUrl: string; // Target service base URL
+  timeout?: number; // Request timeout in milliseconds (default: 5000ms)
   circuitBreaker?: {
     enabled: boolean;
     errorThreshold?: number;
@@ -17,6 +17,13 @@ interface ServiceProxyOptions {
   proxyReqPathResolver?: (req: Request) => Promise<string> | string;
 }
 
+/**
+ * Creates an HTTP proxy middleware configured with circuit breaker protection,
+ * correlation ID propagation, and short-lived internal JWT authentication.
+ *
+ * @param options Configuration options for proxy and circuit breaker
+ * @returns Express middleware function
+ */
 export const createServiceProxy = (options: ServiceProxyOptions) => {
   const {
     serviceName,
@@ -37,10 +44,11 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       }
       proxyReqOpts.headers['X-Correlation-Id'] = String(id() ?? '');
 
-      // Generate the internal token with user context
-      const payload = {
+      // Generate the internal token with user context (including active sessionId)
+      const payload: Omit<InternalTokenPayload, 'aud'> = {
         sub: srcReq.auth?.id || 'anonymous',
         role: srcReq.auth?.role || 'guest',
+        ...(srcReq.auth?.sessionId ? { sessionId: srcReq.auth.sessionId } : {}),
       };
       try {
         const internalToken = generateInternalToken(payload, serviceName);

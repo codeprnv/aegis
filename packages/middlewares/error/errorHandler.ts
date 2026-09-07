@@ -4,6 +4,30 @@ import { ZodError } from 'zod';
 import { logger } from '../../utils/logger.js';
 import { AppError } from './index.js';
 
+/**
+ * Recursively masks sensitive fields such as passwords, OTPs, tokens, and secrets from logged request bodies.
+ */
+function maskSensitiveData(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(maskSensitiveData);
+
+  const sensitivePattern =
+    /password|token|otp|secret|authorization|credential/i;
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (sensitivePattern.test(key)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = maskSensitiveData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
 export const errorMiddleware = (
   err: Error,
 
@@ -27,14 +51,13 @@ export const errorMiddleware = (
     });
   }
 
-  // Log the error
+  // Log the error with all sensitive credential fields redacted
   logger.error(
     {
       err: error,
       method: req.method,
       url: req.url,
-      // Mask passwords from request body in logs
-      body: req.body ? { ...req.body, password: '[REDACTED]' } : undefined,
+      body: req.body ? maskSensitiveData(req.body) : undefined,
     },
     'Global Error Handler'
   );

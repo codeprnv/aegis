@@ -12,11 +12,16 @@ const PUBLIC_KEY: string | null = process.env.API_GATEWAY_PUBLIC_KEY_B64
 export interface InternalTokenPayload {
   sub: string; // User ID
   role: string; // User Role
+  sessionId?: string; // Active Session ID (optional)
   aud?: string; // Target Service (optional)
 }
 
 /**
  * Generates a short-lived internal token to be passed from Gateway -> Service.
+ *
+ * @param payload Internal token payload without audience
+ * @param audience Target downstream service audience
+ * @returns RS256 signed internal JWT string
  */
 export const generateInternalToken = (
   payload: Omit<InternalTokenPayload, 'aud'>,
@@ -28,14 +33,18 @@ export const generateInternalToken = (
 
   return jwt.sign(payload, PRIVATE_KEY, {
     algorithm: 'RS256',
-    expiresIn: '1m', //short-lived
+    expiresIn: '1m', // short-lived
     audience,
     issuer: 'aegis-gateway',
   });
 };
 
 /**
- * Verifies the internal token at the Service level.
+ * Verifies the internal token at the downstream service level.
+ *
+ * @param token RS256 signed internal token
+ * @param expectedAudience Expected downstream service audience
+ * @returns Decoded internal token payload
  */
 export const verifyInternalToken = (
   token: string,

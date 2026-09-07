@@ -1,11 +1,22 @@
 import { NextFunction, Request, Response } from 'express';
 import { verifyAccessToken } from '../../auth/token-service.js';
+import { redis } from '../../database/redis.js';
+import { logger } from '../../utils/logger.js';
 
-export const extractAuthContext = (
+/**
+ * Express middleware that extracts the access token from cookies or authorization header,
+ * verifies the token signature and claims, checks the edge revocation blocklist in Redis,
+ * and attaches the decoded authentication context (id, role, sessionId) to the request.
+ *
+ * @param req Express request
+ * @param res Express response
+ * @param next Next middleware callback
+ */
+export const extractAuthContext = async (
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction
-) => {
+): Promise<void> => {
   const token =
     req.cookies?.['access_token'] || req.headers.authorization?.split(' ')[1];
 
@@ -16,12 +27,36 @@ export const extractAuthContext = (
   try {
     const decodedToken = verifyAccessToken(token);
 
+    // If token has a sessionId, verify against the edge revocation blocklist
+    if (decodedToken.sessionId) {
+      try {
+        const isRevoked = await redis.get(`aegis:revoked:session:${decodedToken.sessionId}`);
+        if (isRevoked) {
+          res.status(401).json({
+            status: 'error',
+            statusCode: 401,
+            message: 'Session has been revoked',
+          });
+          return;
+        }
+      } catch (redisError) {
+        // Fail-safe resilience: log the Redis error without terminating the request
+        logger.warn(
+          { error: redisError, sessionId: decodedToken.sessionId },
+          'Edge session revocation cache lookup failed; proceeding with valid JWT'
+        );
+      }
+    }
+
     req.auth = {
       id: decodedToken.sub,
-      role: decodedToken.role,
+      role: decodedToken.role as 'USER' | 'ADMIN',
+      sessionId: decodedToken.sessionId,
     };
-  } catch (error) {
+  } catch (_error) {
+    // If token verification fails, allow unauthenticated request to proceed to public routes
     return next();
   }
+
   next();
 };

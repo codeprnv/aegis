@@ -8,6 +8,7 @@ declare module 'express' {
     auth?: {
       id: string;
       role: 'USER' | 'ADMIN';
+      sessionId?: string;
     };
     user?: TokenPayload | InternalTokenPayload;
     log?: Logger;

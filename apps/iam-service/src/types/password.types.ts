@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').toLowerCase().trim(),
 });
 
 export const resetPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').toLowerCase().trim(),
   otp: z.string().length(6, 'OTP must be 6 digits'),
   newPassword: z.string().min(8, 'Password must be at least 8 characters long'),
 });

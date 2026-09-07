@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Login Schema
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email format!'),
+  email: z.string().email('Invalid email format!').toLowerCase().trim(),
   password: z.string().min(8, 'Password must be at least 8 characters long!'),
   rememberMe: z.boolean().optional(),
 });
@@ -14,8 +14,11 @@ export type LoginInput = z.infer<typeof loginSchema> & {
 
 // Register Schema
 export const registerSchema = z.object({
-  username: z.string().min(4, 'Username must be at least 4 characters long!'),
-  email: z.string().email('Invalid email format!'),
+  username: z
+    .string()
+    .min(4, 'Username must be at least 4 characters long!')
+    .trim(),
+  email: z.string().email('Invalid email format!').toLowerCase().trim(),
   password: z.string().min(8, 'Password must be at least 8 characters long!'),
   mobile: z
     .string()

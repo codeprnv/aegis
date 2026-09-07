@@ -1,10 +1,13 @@
 import { AUTH_CONFIG } from '@aegis/common';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import RedisClient from 'ioredis';
 
 const redisClient = new RedisClient(process.env.REDIS_URL || 'redis://localhost:6379');
 
+/**
+ * Rate limiter middleware for token refresh requests.
+ */
 export const refreshRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
@@ -20,6 +23,9 @@ export const refreshRateLimiter = rateLimit({
   },
 });
 
+/**
+ * Rate limiter middleware for user authentication requests.
+ */
 export const loginRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
@@ -35,6 +41,9 @@ export const loginRateLimiter = rateLimit({
   },
 });
 
+/**
+ * Rate limiter middleware for user registration requests.
+ */
 export const registerRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
@@ -50,6 +59,9 @@ export const registerRateLimiter = rateLimit({
   },
 });
 
+/**
+ * Rate limiter middleware for password reset requests, keyed by normalized target email with IP fallback.
+ */
 export const forgotPasswordRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
@@ -63,8 +75,19 @@ export const forgotPasswordRateLimiter = rateLimit({
     status: 429,
     message: 'Too many password reset requests. Please try again later',
   },
+  keyGenerator: (req) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    if (email) {
+      return `email:${email}`;
+    }
+    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    return `ip:${ipKeyGenerator(ip)}`;
+  },
 });
 
+/**
+ * Rate limiter middleware for password reset execution, keyed by target identifier with IP fallback.
+ */
 export const resetPasswordRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
@@ -77,5 +100,13 @@ export const resetPasswordRateLimiter = rateLimit({
   message: {
     status: 429,
     message: 'Too many reset attempts. Please try again later.',
+  },
+  keyGenerator: (req) => {
+    const identifier = req.body?.email || req.body?.resetId;
+    if (typeof identifier === 'string' && identifier.trim()) {
+      return `target:${identifier.toLowerCase().trim()}`;
+    }
+    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    return `ip:${ipKeyGenerator(ip)}`;
   },
 });

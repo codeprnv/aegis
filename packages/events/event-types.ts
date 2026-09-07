@@ -28,6 +28,7 @@ export interface PasswordResetRequestedPayload {
   username: string;
   otp: string;
   otpExpiresAt: Date;
+  resetToken?: string;
 }
 
 export interface PasswordResetCompletedPayload {

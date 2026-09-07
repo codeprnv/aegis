@@ -33,7 +33,9 @@ import {
 export const registerUser = async (
   input: RegisterInput
 ): Promise<AuthResponse> => {
-  const { username, email, password, mobile, userAgent, ipAddress } = input;
+  const { password, mobile, userAgent, ipAddress } = input;
+  const email = input.email.toLowerCase().trim();
+  const username = input.username.trim();
 
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.success) {
@@ -236,7 +238,8 @@ export const verifyEmailService = async (token: string): Promise<AuthResponse> =
 };
 
 export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
-  const { email, password, userAgent, ipAddress, rememberMe } = input;
+  const { password, userAgent, ipAddress, rememberMe } = input;
+  const email = input.email.toLowerCase().trim();
 
   const { locked, reason } = await isAccountLocked(email);
   if (locked) {
