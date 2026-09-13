@@ -1,12 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const API_BASE_URL = `${process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080'}/v1`;
+
+/**
+ * Handles client logout by notifying the backend API Gateway to invalidate
+ * active session state and clearing local authentication cookies.
+ *
+ * @param request - Incoming Next.js HTTP request.
+ * @returns 303 redirect response to login route with cleared cookies.
+ */
 export async function GET(request: NextRequest) {
-  // Create a 303 redirect to the login page
+  const cookieHeader = request.headers.get('cookie') || '';
+  const correlationId = request.headers.get('x-correlation-id') || crypto.randomUUID();
+
+  try {
+    if (cookieHeader) {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Correlation-ID': correlationId,
+          Cookie: cookieHeader,
+        },
+        cache: 'no-store',
+      });
+    }
+  } catch {
+    // Graceful fallback to proceed with local cookie clearance if backend is unavailable
+  }
+
   const response = NextResponse.redirect(new URL('/login', request.url), 303);
-  
-  // Clear the cookies
+
   response.cookies.delete('access_token');
   response.cookies.delete('refresh_token');
-  
+
   return response;
 }
+

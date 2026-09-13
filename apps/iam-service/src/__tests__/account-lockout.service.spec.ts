@@ -4,7 +4,7 @@ import {
   isAccountLocked,
   recordFailedAttempt,
   unlockAccount,
-} from '../services/account-lockout.service';
+} from '../services/auth/account-lockout.service';
 
 const mockIsLocked = jest.fn();
 const mockGetTTL = jest.fn();

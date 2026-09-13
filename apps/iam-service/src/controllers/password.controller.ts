@@ -1,8 +1,8 @@
 import { BadRequestError } from '@aegis/middlewares';
 import type { NextFunction, Request, Response } from 'express';
-import * as adminResetService from '../services/admin-reset-password.service';
-import * as changePasswordService from '../services/change-password.service';
-import * as forgotPasswordService from '../services/forgot-password.service';
+import * as adminResetService from '../services/password/admin-reset-password.service';
+import * as changePasswordService from '../services/password/change-password.service';
+import * as forgotPasswordService from '../services/password/forgot-password.service';
 import {
   changePasswordSchema,
   forgotPasswordSchema,

@@ -5,11 +5,13 @@ export const loginSchema = z.object({
   email: z.string().email('Invalid email format!').toLowerCase().trim(),
   password: z.string().min(8, 'Password must be at least 8 characters long!'),
   rememberMe: z.boolean().optional(),
+  deviceFingerprint: z.string().optional(),
 });
 
 export type LoginInput = z.infer<typeof loginSchema> & {
   userAgent?: string;
   ipAddress?: string;
+  headers?: Record<string, string | string[] | undefined>;
 };
 
 // Register Schema

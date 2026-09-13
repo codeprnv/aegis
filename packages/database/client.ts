@@ -1,11 +1,19 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool } from 'pg';
-import { PrismaClient } from '../../generated/prisma/client.js';
+import { Pool, type PoolConfig } from 'pg';
 import { PrismaClient as NotificationPrismaClient } from '../../generated/prisma-notification/client.js';
+import { PrismaClient } from '../../generated/prisma/client.js';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   notificationPrisma: NotificationPrismaClient | undefined;
+  pgPool: Pool | undefined;
+  notificationPgPool: Pool | undefined;
+};
+
+const POOL_CONFIG: PoolConfig = {
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 };
 
 /**
@@ -18,7 +26,8 @@ function createPrismaClient(): PrismaClient {
     throw new Error('DATABASE_URL environment variable is not set');
   }
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ connectionString, ...POOL_CONFIG });
+  globalForPrisma.pgPool = pool;
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({
@@ -43,9 +52,11 @@ function createNotificationPrismaClient(): NotificationPrismaClient {
 
   const url = new URL(baseConnectionString);
   url.searchParams.set('schema', 'notifications');
-  const connectionString = process.env.NOTIFICATION_DATABASE_URL || url.toString();
+  const connectionString =
+    process.env.NOTIFICATION_DATABASE_URL || url.toString();
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ connectionString, ...POOL_CONFIG });
+  globalForPrisma.notificationPgPool = pool;
   const adapter = new PrismaPg(pool);
 
   return new NotificationPrismaClient({
@@ -73,5 +84,7 @@ export async function disconnectPrisma(): Promise<void> {
   await Promise.all([
     prisma.$disconnect(),
     notificationPrisma.$disconnect(),
+    globalForPrisma.pgPool?.end(),
+    globalForPrisma.notificationPgPool?.end(),
   ]);
 }

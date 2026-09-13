@@ -1,7 +1,14 @@
 import { hashTokenSHA256, logger } from '@aegis/common';
 import { redis } from '@aegis/database';
+import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { randomBytes } from 'crypto';
 
+/**
+ * Re-issues and dispatches a fresh email verification token for a pending registration.
+ * Rotates the cryptographic token in Redis while preserving the staged registration payload.
+ *
+ * @param email - Target user's email address
+ */
 export async function resendVerificationEmail(email: string): Promise<void> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
@@ -25,11 +32,9 @@ export async function resendVerificationEmail(email: string): Promise<void> {
       return;
     }
 
-    // Rotate and generate a fresh raw verification token and hash
     const newRawToken = randomBytes(32).toString('hex');
     const newTokenHash = hashTokenSHA256(newRawToken);
 
-    // Replace old hash in Redis with new hash
     await redis.del(`registration:${existingTokenHash}`);
     await redis.setex(`registration:${newTokenHash}`, 86400, pendingData);
     await redis.setex(`registration:email:${email}`, 86400, newTokenHash);
@@ -39,18 +44,14 @@ export async function resendVerificationEmail(email: string): Promise<void> {
       newTokenHash
     );
 
-    import('@aegis/events')
-      .then(({ enqueueNotification, NotificationEvent }) => {
-        enqueueNotification(NotificationEvent.EMAIL_VERIFICATION_REQUESTED, {
-          userId: 'pending',
-          email: pendingData.email,
-          username: pendingData.username,
-          verificationToken: newRawToken,
-        });
-      })
-      .catch((err) => {
-        logger.error(err, 'Failed to enqueue resend verification email');
-      });
+    enqueueNotification(NotificationEvent.EMAIL_VERIFICATION_REQUESTED, {
+      userId: 'pending',
+      email: pendingData.email,
+      username: pendingData.username,
+      verificationToken: newRawToken,
+    }).catch((err: Error) => {
+      logger.error({ error: err.message, email }, 'Failed to enqueue resend verification email');
+    });
 
     logger.info({ email }, 'Re-dispatched fresh email verification event');
   } catch (error) {

@@ -2,7 +2,9 @@ import z from 'zod';
 
 // Shared downstream service env fields
 export const downstreamServiceBase = z.object({
-  API_GATEWAY_PUBLIC_KEY_B64: z.string().min(1, 'API Gateway public key is required'),
+  API_GATEWAY_PUBLIC_KEY_B64: z
+    .string()
+    .min(1, 'API Gateway public key is required'),
 });
 
 export const apiGatewayEnvSchema = z.object({
@@ -44,31 +46,41 @@ export const iamServiceEnvSchema = downstreamServiceBase.extend({
   DATABASE_URL: z.coerce.string<string>(),
   UPSTASH_REDIS_REST_URL: z.coerce.string<string>(),
   UPSTASH_REDIS_REST_TOKEN: z.coerce.string<string>(),
+  UPSTASH_REDIS_URL: z.coerce.string<string>().optional(),
 });
 
 export const notificationServiceEnvSchema = downstreamServiceBase.extend({
   RESEND_API_KEY: z.coerce.string<string>(),
   UPSTASH_REDIS_REST_URL: z.coerce.string<string>(),
   UPSTASH_REDIS_REST_TOKEN: z.coerce.string<string>(),
+  UPSTASH_REDIS_URL: z.coerce.string<string>().optional(),
   FRONTEND_URL: z.coerce.string<string>().default('http://localhost:3000'),
 });
 
 // Future services placeholders
 export const userServiceEnvSchema = downstreamServiceBase.extend({});
 export const fileStorageServiceEnvSchema = downstreamServiceBase.extend({});
-export const auditServiceEnvSchema = downstreamServiceBase.extend({});
+export const auditServiceEnvSchema = downstreamServiceBase.extend({
+  AUDIT_SERVICE_PORT: z.coerce.number<number>().default(6004),
+  DATABASE_URL: z.coerce.string<string>().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.coerce.string<string>().optional(),
+  UPSTASH_REDIS_URL: z.coerce.string<string>().optional(),
+});
 export const rolesServiceEnvSchema = downstreamServiceBase.extend({});
 
 export type ApiGatewayEnv = z.infer<typeof apiGatewayEnvSchema>;
 export type IamServiceEnv = z.infer<typeof iamServiceEnvSchema>;
-export type NotificationServiceEnv = z.infer<typeof notificationServiceEnvSchema>;
+export type NotificationServiceEnv = z.infer<
+  typeof notificationServiceEnvSchema
+>;
+export type AuditServiceEnv = z.infer<typeof auditServiceEnvSchema>;
 
-export default { 
-  apiGatewayEnvSchema, 
-  iamServiceEnvSchema, 
+export default {
+  apiGatewayEnvSchema,
+  iamServiceEnvSchema,
   notificationServiceEnvSchema,
   userServiceEnvSchema,
   fileStorageServiceEnvSchema,
   auditServiceEnvSchema,
-  rolesServiceEnvSchema
+  rolesServiceEnvSchema,
 };

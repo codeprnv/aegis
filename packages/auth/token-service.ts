@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import { BadRequestError } from '../middlewares/error/index.js';
 
 import { AUTH_CONFIG } from '../utils/common-config.js';
@@ -7,7 +7,8 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET as string;
 const ACCESS_TOKEN_EXPIRY = AUTH_CONFIG.ACCESS_TOKEN_EXPIRY;
 
 // Use dedicated refresh secret if available, otherwise fall back to JWT_SECRET
-const REFRESH_TOKEN_SECRET = (process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET) as string;
+const REFRESH_TOKEN_SECRET = (process.env.JWT_REFRESH_SECRET ||
+  process.env.JWT_SECRET) as string;
 const REFRESH_TOKEN_EXPIRY = AUTH_CONFIG.REFRESH_TOKEN_EXPIRY;
 
 export interface TokenPayload {
@@ -50,11 +51,11 @@ export const generateRefreshToken = (
   payload: TokenPayload,
   issuer = 'iam-service',
   audience = 'aegis-client',
-  expiresIn = REFRESH_TOKEN_EXPIRY
+  expiresIn: string | number = REFRESH_TOKEN_EXPIRY
 ) => {
   if (!payload) throw new BadRequestError('Invalid Payload!');
   return jwt.sign({ ...payload, type: 'refresh' }, REFRESH_TOKEN_SECRET, {
-    expiresIn: expiresIn,
+    expiresIn: expiresIn as SignOptions['expiresIn'],
     issuer: issuer,
     audience: audience,
   });

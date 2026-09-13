@@ -9,16 +9,27 @@ import {
   setLockout as redisSetLockout,
 } from '@aegis/database';
 
-export const isAccountLocked = async (
-  email: string
-): Promise<{
+/**
+ * Result structure of an account lockout status inquiry.
+ */
+export interface AccountLockoutStatus {
   locked: boolean;
   remainingSeconds?: number;
   reason?: string;
-}> => {
+}
+
+/**
+ * Checks whether an account is currently locked out due to excessive failed attempts.
+ * Queries Redis first for edge performance, with PostgreSQL fallback for persistent locks.
+ *
+ * @param email - User's email identifier
+ * @returns Status detailing whether the account is locked and remaining duration
+ */
+export const isAccountLocked = async (
+  email: string
+): Promise<AccountLockoutStatus> => {
   const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
 
-  // Check redis first
   try {
     const isLockedInRedis = await redisIsLocked(lockKey);
 
@@ -34,11 +45,8 @@ export const isAccountLocked = async (
     logger.error(error, 'Failed to check Redis for account lockout');
   }
 
-  // Fallback:Check database
   const user = await prisma.user.findUnique({
-    where: {
-      email,
-    },
+    where: { email },
     select: {
       accountLocked: true,
       lockedUntil: true,
@@ -47,22 +55,19 @@ export const isAccountLocked = async (
   });
 
   if (user?.accountLocked) {
-    // Check if lock has expiration and is expired
     if (user.lockedUntil) {
       if (user.lockedUntil < new Date()) {
-        //  Lock expired - unlock the user account
         await unlockAccount(email);
         return { locked: false };
       }
     } else {
-      // No expiration data - permanently locked
       return {
         locked: true,
         remainingSeconds: undefined,
         reason: user.accountLockedReason || 'Account permanently locked',
       };
     }
-    // Lock still active with time remaining
+
     return {
       locked: true,
       remainingSeconds: user.lockedUntil
@@ -71,9 +76,16 @@ export const isAccountLocked = async (
       reason: user.accountLockedReason || 'Account locked by admin',
     };
   }
+
   return { locked: false };
 };
 
+/**
+ * Locks an account across both Redis (for instant edge enforcement) and PostgreSQL (for persistence).
+ *
+ * @param email - Target user's email
+ * @param reason - Diagnostic reason for account lockout
+ */
 export const lockAccount = async (
   email: string,
   reason: string
@@ -92,12 +104,11 @@ export const lockAccount = async (
     );
   }
 
-  // Persist to database
   await prisma.user.updateMany({
     where: { email },
     data: {
       accountLocked: true,
-      lockedUntil: lockedUntil,
+      lockedUntil,
       accountLockedReason: reason,
       accountLockedAt: new Date(),
       failedLoginAttempts: AUTH_CONFIG.MAX_FAILED_ATTEMPTS,
@@ -115,17 +126,20 @@ export const lockAccount = async (
   );
 };
 
+/**
+ * Unlocks an account, resetting Redis counters and clearing database lockout flags.
+ *
+ * @param email - Target user's email
+ */
 export const unlockAccount = async (email: string): Promise<void> => {
   const attemptKey = REDIS_KEYS.FAILED_ATTEMPTS(email);
   const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
 
-  // Clear Redis keys
   await Promise.all([
     redisResetCounter(attemptKey),
     redisClearLockout(lockKey),
   ]);
 
-  // Update database
   await prisma.user.updateMany({
     where: { email },
     data: {
@@ -141,7 +155,14 @@ export const unlockAccount = async (email: string): Promise<void> => {
   logger.info({ email }, 'Account unlocked');
 };
 
-// Record failed login attempt
+/**
+ * Increments failed authentication attempts in Redis within a rolling window.
+ * Triggers account lockout if the configured failure threshold is breached.
+ *
+ * @param email - Candidate email attempted
+ * @param ipAddress - Client IP address of the failed attempt
+ * @returns Status indicating whether account was locked and attempts remaining
+ */
 export const recordFailedAttempt = async (
   email: string,
   ipAddress?: string
@@ -164,7 +185,6 @@ export const recordFailedAttempt = async (
     threshold: AUTH_CONFIG.MAX_FAILED_ATTEMPTS,
   });
 
-  // Check if threshold is reached
   if (attemptCount >= AUTH_CONFIG.MAX_FAILED_ATTEMPTS) {
     await lockAccount(email, 'Too many failed login attempts!');
     return {
@@ -172,13 +192,18 @@ export const recordFailedAttempt = async (
       attemptRemaining: 0,
     };
   }
+
   return {
     shouldLock: false,
     attemptRemaining: AUTH_CONFIG.MAX_FAILED_ATTEMPTS - attemptCount,
   };
 };
 
-// Record successful login
+/**
+ * Resets failed attempts upon successful login and updates the user's active timestamps.
+ *
+ * @param email - Authenticated user's email
+ */
 export const recordSuccessfulLogin = async (email: string): Promise<void> => {
   await unlockAccount(email);
 

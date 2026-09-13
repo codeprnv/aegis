@@ -2,7 +2,7 @@ import { clearCookie, setCookie } from '@aegis/auth';
 import { AUTH_CONFIG } from '@aegis/common';
 import { BadRequestError } from '@aegis/middlewares';
 import type { NextFunction, Request, Response } from 'express';
-import * as authService from '../services/auth.service';
+import * as authService from '../services';
 import { loginSchema, registerSchema } from '../types/auth.types';
 
 /**
@@ -57,13 +57,17 @@ export const loginUserController = async (
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
       rememberMe: validatedData.rememberMe,
+      deviceFingerprint:
+        validatedData.deviceFingerprint ||
+        (req.headers['x-device-fingerprint'] as string | undefined),
+      headers: req.headers,
     });
 
     setCookie('access_token', data.accessToken || '', res);
-    
+
     const refreshTokenMaxAge = validatedData.rememberMe
       ? 15 * 24 * 60 * 60 * 1000 // 15 days
-      : 24 * 60 * 60 * 1000;     // 1 day
+      : 24 * 60 * 60 * 1000; // 1 day
 
     setCookie('refresh_token', data.refreshToken || '', res, {
       maxAge: refreshTokenMaxAge,
@@ -130,7 +134,7 @@ export const logoutController = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.user.sub;
+    const userId = req.user?.sub;
     let sessionId = req.headers['x-session-id'] as string;
     const logoutAll = req.body.logoutAll === true;
 
@@ -138,7 +142,9 @@ export const logoutController = async (
       try {
         const { verifyRefreshToken } = await import('@aegis/auth');
         const decoded = verifyRefreshToken(req.cookies['refresh_token']);
-        sessionId = decoded.sessionId;
+        if (decoded.sessionId) {
+          sessionId = decoded.sessionId;
+        }
       } catch (err) {
         // Ignore if invalid/expired
       }
@@ -174,7 +180,7 @@ export const getMeController = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.user.sub;
+    const userId = req.user?.sub;
 
     if (!userId) {
       throw new BadRequestError('User ID is required!');

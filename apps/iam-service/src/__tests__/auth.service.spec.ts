@@ -5,8 +5,9 @@ import {
   isAccountLocked,
   recordFailedAttempt,
   recordSuccessfulLogin,
-} from '../services/account-lockout.service';
-import { loginUser } from '../services/auth.service';
+} from '../services/auth/account-lockout.service';
+import { publishLoginSecurityEvent } from '../services/events/auth-events.publisher';
+import { loginUser } from '../services/auth/login.service';
 
 jest.mock('@aegis/database', () => ({
   prisma: {
@@ -19,11 +20,15 @@ jest.mock('@aegis/database', () => ({
       create: jest.fn(),
     },
     $transaction: jest.fn().mockImplementation(async (cb) => {
-      // Mock the transaction object `tx` to be the same as `prisma`
       const tx = {
-        user: { 
-          create: jest.fn().mockResolvedValue({ id: 'test-user-id', username: 'testuser', email: 'test@example.com', role: 'USER' }), 
-          update: jest.fn() 
+        user: {
+          create: jest.fn().mockResolvedValue({
+            id: 'test-user-id',
+            username: 'testuser',
+            email: 'test@example.com',
+            role: 'USER',
+          }),
+          update: jest.fn(),
         },
         session: { create: jest.fn(), updateMany: jest.fn() },
         passwordHistory: { create: jest.fn() },
@@ -45,10 +50,16 @@ jest.mock('@aegis/auth', () => ({
   generateRefreshToken: jest.fn().mockReturnValue('mock-refresh-token'),
 }));
 
-jest.mock('../services/account-lockout.service', () => ({
+jest.mock('../services/auth/account-lockout.service', () => ({
   isAccountLocked: jest.fn(),
   recordFailedAttempt: jest.fn(),
   recordSuccessfulLogin: jest.fn(),
+}));
+
+jest.mock('../services/events/auth-events.publisher', () => ({
+  publishLoginSecurityEvent: jest.fn(),
+  publishUserRegistered: jest.fn(),
+  publishEmailVerificationRequested: jest.fn(),
 }));
 
 describe('Auth Service - loginUser', () => {
@@ -76,6 +87,8 @@ describe('Auth Service - loginUser', () => {
     const result = await loginUser({
       email: 'test@example.com',
       password: 'password123',
+      userAgent: 'Mozilla/5.0',
+      ipAddress: '192.168.1.1',
     });
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
@@ -92,6 +105,15 @@ describe('Auth Service - loginUser', () => {
     expect(result).toHaveProperty('accessToken', 'mock-access-token');
     expect(result).toHaveProperty('refreshToken', 'mock-refresh-token');
     expect(result.id).toBe(mockUser.id);
+
+    expect(publishLoginSecurityEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: mockUser.id,
+        email: mockUser.email,
+        ipAddress: '192.168.1.1',
+        userAgent: 'Mozilla/5.0',
+      })
+    );
   });
 
   it('should throw UnauthorizedError if user not found', async () => {

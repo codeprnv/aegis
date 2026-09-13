@@ -3,6 +3,7 @@ import express, { type Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import * as resendController from '../controllers/auth.controller.resend-verification';
 import * as passwordController from '../controllers/password.controller';
+import * as sessionController from '../controllers/session.controller';
 import {
   forgotPasswordRateLimiter,
   loginRateLimiter,
@@ -64,6 +65,23 @@ router.post(
   '/change-password',
   requireInternalToken('iam-service'),
   passwordController.changePasswordController
+);
+
+// Session management routes (authenticated)
+router.get(
+  '/sessions',
+  requireInternalToken('iam-service'),
+  sessionController.listSessionsHandler
+);
+router.delete(
+  '/sessions/:sessionId',
+  requireInternalToken('iam-service'),
+  sessionController.revokeSessionHandler
+);
+router.delete(
+  '/sessions',
+  requireInternalToken('iam-service'),
+  sessionController.revokeAllOtherSessionsHandler
 );
 
 export default router;

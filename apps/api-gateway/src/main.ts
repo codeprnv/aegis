@@ -39,7 +39,7 @@ const {
 const app = express();
 
 // Trust reverse proxies to get the real client IP (e.g. from Cloudflare, Nginx, or AWS ALB)
-app.set('trust proxy', 1);
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
 app.use(requestTracer);
 app.use(sanitizeHeaders);
@@ -115,7 +115,10 @@ const v1Router = express.Router();
 
 // Auth Rate Limiter - DDoS protection (must be BEFORE proxy)
 // Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
-v1Router.use(/^\/auth\/(login|register|reset-password|forgot-password)\/?$/i, authRateLimiter);
+v1Router.use(
+  /^\/auth\/(login|register|reset-password|forgot-password)\/?$/i,
+  authRateLimiter
+);
 
 v1Router.use(
   '/auth',

@@ -4,7 +4,7 @@ import { BadRequestError } from '@aegis/middlewares';
 const {
   canUsePassword,
   validateAndStorePassword,
-} = require('../services/password-history.service');
+} = require('../services/password/password-history.service');
 
 jest.mock('@aegis/common', () => ({
   ...jest.requireActual('@aegis/common'),

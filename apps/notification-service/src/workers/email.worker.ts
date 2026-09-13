@@ -15,9 +15,10 @@ export const startEmailWorker = (): Worker => {
 
       try {
         // Idempotency: Check if job is already processed
-        const existingNotification = await notificationPrisma.notification.findUnique({
-          where: { idempotencyKey: job.id! },
-        });
+        const existingNotification =
+          await notificationPrisma.notification.findUnique({
+            where: { idempotencyKey: job.id! },
+          });
 
         if (existingNotification && existingNotification.status === 'sent') {
           logger.info(`Job ${job.id} already processed. Skipping.`);
@@ -65,14 +66,24 @@ export const startEmailWorker = (): Worker => {
       } catch (error: any) {
         logger.error(`Failed to process job ${job.id}: ${error.message}`);
 
-        // Log failure
-        await notificationPrisma.notification.update({
-          where: { idempotencyKey: job.id! },
-          data: {
-            status: 'failed',
-            errorMessage: error.message,
-          },
-        });
+        // Log failure safely without masking the original exception
+        if (job.id) {
+          await notificationPrisma.notification
+            .updateMany({
+              where: { idempotencyKey: job.id },
+              data: {
+                status: 'failed',
+                errorMessage:
+                  error instanceof Error ? error.message : String(error),
+              },
+            })
+            .catch((dbErr) => {
+              logger.warn(
+                { dbErr },
+                `Could not update failure status for job ${job.id}`
+              );
+            });
+        }
 
         throw error; // Throwing triggers BullMQ's automatic exponential backoff retry
       }

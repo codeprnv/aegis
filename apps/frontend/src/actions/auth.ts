@@ -1,6 +1,6 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { buildCookieHeader, propagateCookies } from '../lib/cookie-utils';
 import { getCorrelationId } from '../lib/request-context';
@@ -32,6 +32,38 @@ function extractErrorMessage(data: unknown, fallback: string): string {
   return err?.message || fallback;
 }
 
+/*
+ ** Extracts and sanitizes client telemetry and IP information from the incoming request. Prioritizes trusted proxy headers before falling back to X-Forwarded-For or localhost
+ */
+
+async function getClientTelemetryHeaders(): Promise<Record<string, string>> {
+  const incomingHeaders = await headers();
+  const rawForwardedFor = incomingHeaders.get('x-forwarded-for');
+  const realIp =
+    incomingHeaders.get('cf-connecting-ip') ||
+    incomingHeaders.get('x-real-ip') ||
+    (rawForwardedFor ? rawForwardedFor.split(',')[0].trim() : '127.0.0.1');
+
+  const telemetryHeaders: Record<string, string> = {
+    'X-Forwarded-For': realIp,
+    'X-Real-IP': realIp,
+  };
+
+  const userAgent = incomingHeaders.get('user-agent');
+  if (userAgent) telemetryHeaders['User-Agent'] = userAgent;
+
+  const acceptLanguage = incomingHeaders.get('accept-language');
+  if (acceptLanguage) telemetryHeaders['Accept-Language'] = acceptLanguage;
+
+  const secChUa = incomingHeaders.get('sec-ch-ua');
+  if (secChUa) telemetryHeaders['Sec-CH-UA'] = secChUa;
+
+  const secChUaPlatform = incomingHeaders.get('sec-ch-ua-platform');
+  if (secChUaPlatform) telemetryHeaders['Sec-CH-UA-Platform'] = secChUaPlatform;
+
+  return telemetryHeaders;
+}
+
 /**
  * Authenticates a user with the API Gateway and establishes a secure session.
  * Automatically propagates HTTP-only cookies to the Next.js context upon success.
@@ -43,12 +75,14 @@ export async function loginAction(formData: {
 }): Promise<AuthActionResult> {
   try {
     const correlationId = await getCorrelationId();
+    const clientHeaders = await getClientTelemetryHeaders();
 
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Correlation-ID': correlationId,
+        ...clientHeaders,
       },
       body: JSON.stringify(formData),
       cache: 'no-store',
@@ -64,7 +98,10 @@ export async function loginAction(formData: {
 
       return {
         success: false,
-        error: extractErrorMessage(data, 'Invalid credentials or server error.'),
+        error: extractErrorMessage(
+          data,
+          'Invalid credentials or server error.'
+        ),
         requiresEmailVerification: isEmailNotVerified,
       };
     }
@@ -73,7 +110,8 @@ export async function loginAction(formData: {
       return {
         success: false,
         message: data.message || 'Temporary password must be changed.',
-        error: data.message || 'Please change your temporary password to continue.',
+        error:
+          data.message || 'Please change your temporary password to continue.',
         requiresPasswordChange: true,
       };
     }
@@ -101,12 +139,14 @@ export async function registerAction(formData: {
 }): Promise<AuthActionResult> {
   try {
     const correlationId = await getCorrelationId();
+    const clientHeaders = await getClientTelemetryHeaders();
 
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Correlation-ID': correlationId,
+        ...clientHeaders,
       },
       body: JSON.stringify(formData),
       cache: 'no-store',
@@ -117,7 +157,10 @@ export async function registerAction(formData: {
     if (!response.ok) {
       return {
         success: false,
-        error: extractErrorMessage(data, 'Registration failed. Please try again.'),
+        error: extractErrorMessage(
+          data,
+          'Registration failed. Please try again.'
+        ),
       };
     }
 

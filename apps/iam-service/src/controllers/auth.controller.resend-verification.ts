@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import * as resendVerificationService from '../services/resend-verification.service';
+import * as resendVerificationService from '../services/auth/resend-verification.service';
 
 const resendVerificationSchema = z.object({
   email: z.email('Invalid email address'),

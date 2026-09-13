@@ -1,15 +1,17 @@
-/* TODO: Implement initial admin user */
-
 import { hashPassword, logger } from '@aegis/common';
 import { prisma } from '@aegis/database';
+import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError, ForbiddenError } from '@aegis/middlewares';
 import crypto from 'crypto';
 
-// Generate temporary password (admin action)
-// Format: TempPass#2024AB
-
+/**
+ * Generates an administrative temporary password adhering to complexity requirements.
+ * Excludes ambiguous characters (O, 0, I, 1) to prevent transcription errors.
+ *
+ * @returns Temporary password string
+ */
 const generateTemporaryPassword = (): string => {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZ23456789'; // Excluding lowercase letters and confusing chars (O, 0, I, 1)
+  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZ23456789';
   const randomChars = Array.from({ length: 6 }, () =>
     chars.charAt(crypto.randomInt(0, chars.length))
   ).join('');
@@ -17,12 +19,20 @@ const generateTemporaryPassword = (): string => {
   return `TempPass#${randomChars}`;
 };
 
-// Admin reset user password
+/**
+ * Administratively resets a target user's credentials, flags the account for mandatory
+ * password change on subsequent authentication, and revokes all existing active sessions.
+ *
+ * @param adminUserId - User ID of the initiating administrator
+ * @param targetUserId - User ID of the account undergoing password reset
+ * @returns Temporary password assigned to the account
+ * @throws {BadRequestError} If administrator or target user does not exist, or if self-reset is attempted
+ * @throws {ForbiddenError} If initiating user lacks ADMIN role or attempts to reset another administrator
+ */
 export const adminResetPassword = async (
   adminUserId: string,
   targetUserId: string
 ): Promise<{ temporaryPassword: string }> => {
-  // Verify admin has permission
   const admin = await prisma.user.findUnique({
     where: { id: adminUserId },
     select: { id: true, role: true, email: true },
@@ -36,7 +46,6 @@ export const adminResetPassword = async (
     throw new ForbiddenError('Insufficient permissions to reset passwords');
   }
 
-  // Verify target user exists
   const targetUser = await prisma.user.findUnique({
     where: { id: targetUserId },
     select: { id: true, email: true, role: true, username: true },
@@ -46,42 +55,36 @@ export const adminResetPassword = async (
     throw new BadRequestError('Target user not found!');
   }
 
-  // Prevent self-reset
   if (targetUser.id === adminUserId) {
     throw new BadRequestError(
       'Admin cannot reset their own password. Use change password instead'
     );
   }
 
-  // Prevent resetting other admin password
   if (targetUser.role === 'ADMIN') {
     throw new ForbiddenError('Admin cannot reset other admin password');
   }
 
-  // Generate temporary password
   const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
 
   await prisma.$transaction(async (tx) => {
-    // Update user password and set force change flag
     await tx.user.update({
       where: { id: targetUserId },
       data: {
-        passwordHash: passwordHash,
+        passwordHash,
         passwordChangedAt: new Date(),
-        forcePasswordChange: true, // Force user to change password on next login
+        forcePasswordChange: true,
       },
     });
 
-    // Store in password history
     await tx.passwordHistory.create({
       data: {
         userId: targetUserId,
-        passwordHash: passwordHash,
+        passwordHash,
       },
     });
 
-    // Revoke all sessions
     await tx.session.updateMany({
       where: { userId: targetUserId, revokedAt: null },
       data: {
@@ -90,27 +93,33 @@ export const adminResetPassword = async (
       },
     });
   });
-  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
-    enqueueNotification(NotificationEvent.ADMIN_PASSWORD_RESET, {
-      userId: targetUserId,
-      email: targetUser.email,
-      username: targetUser.username,
-      temporaryPassword: temporaryPassword,
-    });
-  }).catch(err => logger.error('Failed to enqueue admin password reset email', err));
-  // Debug: For development
+
+  enqueueNotification(NotificationEvent.ADMIN_PASSWORD_RESET, {
+    userId: targetUserId,
+    email: targetUser.email,
+    username: targetUser.username,
+    temporaryPassword,
+  }).catch((err: Error) =>
+    logger.error({ error: err.message, targetUserId }, 'Failed to enqueue admin password reset email')
+  );
+
   logger.warn({
     message: 'Admin reset user password',
     adminId: adminUserId,
     adminEmail: admin.email,
-    targetUserId: targetUserId,
+    targetUserId,
     targetUserEmail: targetUser.email,
   });
 
   return { temporaryPassword };
 };
 
-// Check if user is forced to change password
+/**
+ * Checks whether a given user is flagged for mandatory password change.
+ *
+ * @param userId - Unique identifier of the user
+ * @returns Boolean indicating whether password change is mandatory
+ */
 export const shouldForcePasswordChange = async (
   userId: string
 ): Promise<boolean> => {

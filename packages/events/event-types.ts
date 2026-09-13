@@ -60,3 +60,60 @@ export type NotificationPayloadMap = {
   [NotificationEvent.PASSWORD_CHANGED]: PasswordChangePayload;
   [NotificationEvent.ADMIN_PASSWORD_RESET]: AdminPasswordResetPayload;
 };
+
+// ---- Security Event Types & Payloads ----
+
+export enum SecurityEvent {
+  AUTH_LOGIN_SUCCESS = 'auth.login.success',
+  AUTH_SESSION_REVOKE = 'auth.session.revoke',
+  AUTH_ANOMALY_IMPOSSIBLE_TRAVEL = 'auth.anomaly.impossible_travel',
+  AUTH_ANOMALY_NEW_DEVICE = 'auth.anomaly.new_device',
+}
+
+export interface AuthLoginSuccessPayload {
+  eventId: string;
+  userId: string;
+  sessionId: string;
+  email: string;
+  ipAddress: string;
+  userAgent: string;
+  deviceFingerprint: string;
+  timestamp: number;
+}
+
+export interface AuthSessionRevokePayload {
+  sessionId: string;
+  userId: string;
+  reason: string;
+  source: 'AUDIT_SERVICE' | 'USER' | 'ADMIN';
+}
+
+export interface ImpossibleTravelPayload {
+  userId: string;
+  sessionId: string;
+  email: string;
+  currentCity?: string;
+  previousCity?: string;
+  velocityKmH: number;
+  timestamp: number;
+}
+
+export interface NewDevicePayload {
+  userId: string;
+  email: string;
+  deviceName?: string;
+  browserName?: string;
+  osName?: string;
+  ipAddress: string;
+  timestamp: number;
+}
+
+/*
+ ** Union type mapping each security event to its corresponding payload
+ */
+export type SecurityPayloadMap = {
+  [SecurityEvent.AUTH_LOGIN_SUCCESS]: AuthLoginSuccessPayload;
+  [SecurityEvent.AUTH_SESSION_REVOKE]: AuthSessionRevokePayload;
+  [SecurityEvent.AUTH_ANOMALY_IMPOSSIBLE_TRAVEL]: ImpossibleTravelPayload;
+  [SecurityEvent.AUTH_ANOMALY_NEW_DEVICE]: NewDevicePayload;
+};

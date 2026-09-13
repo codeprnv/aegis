@@ -1,12 +1,23 @@
 import { logger, validatePassword, verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
+import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError } from '@aegis/middlewares';
 import {
   canUsePassword,
   validateAndStorePassword,
 } from './password-history.service';
 
-// Change password - authenticated user
+/**
+ * Executes a self-service password change for an authenticated user,
+ * invalidating all alternative active sessions.
+ *
+ * @param userId - Unique identifier of the authenticated user
+ * @param currentPassword - Existing plaintext password for verification
+ * @param newPassword - Proposed plaintext password
+ * @param currentSessionId - Optional session ID to retain as active
+ * @returns Count of revoked sessions terminated during the password rotation
+ * @throws {BadRequestError} When credentials or policy validation fails
+ */
 export const changePassword = async (
   userId: string,
   currentPassword: string,
@@ -27,7 +38,6 @@ export const changePassword = async (
     throw new BadRequestError('User not found!');
   }
 
-  // Verify the current password
   const isCurrentPasswordValid = await verifyPassword(
     currentPassword,
     user.passwordHash || ''
@@ -37,13 +47,11 @@ export const changePassword = async (
     throw new BadRequestError('Current password is incorrect!');
   }
 
-  // Validate new password against password policy
   const passwordValidation = await validatePassword(newPassword);
-  if (passwordValidation.success === false && passwordValidation.error) {
+  if (!passwordValidation.success && passwordValidation.error) {
     throw new BadRequestError(passwordValidation.error || 'Invalid password!');
   }
 
-  // Check if the new password is same as the current password
   const isSamePassword = await verifyPassword(
     newPassword,
     user.passwordHash || ''
@@ -55,16 +63,12 @@ export const changePassword = async (
     );
   }
 
-  // Check password history
   await canUsePassword(userId, newPassword);
-
-  // Update password
   await validateAndStorePassword(userId, newPassword);
 
-  // Revoke all sessions Except current session
   const result = await prisma.session.updateMany({
     where: {
-      userId: userId,
+      userId,
       revokedAt: null,
       id: currentSessionId ? { not: currentSessionId } : undefined,
     },
@@ -74,14 +78,14 @@ export const changePassword = async (
     },
   });
 
-  import('@aegis/events').then(({ enqueueNotification, NotificationEvent }) => {
-    enqueueNotification(NotificationEvent.PASSWORD_CHANGED, {
-      userId: user.id,
-      email: user.email,
-      username: user.username, // actual username
-    });
-  }).catch(err => logger.error('Failed to enqueue password changed email', err));
-  // Debug: For development
+  enqueueNotification(NotificationEvent.PASSWORD_CHANGED, {
+    userId: user.id,
+    email: user.email,
+    username: user.username,
+  }).catch((err: Error) =>
+    logger.error({ error: err.message, userId: user.id }, 'Failed to enqueue password changed email')
+  );
+
   logger.info({
     message: 'Password changed successfully',
     userId: user.id,

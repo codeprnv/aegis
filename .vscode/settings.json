@@ -1,4 +1,9 @@
 {
-  "cSpell.words": ["ABCDEFGHJKLMNOPQRSTUVWXYZ"],
+  "cSpell.words": [
+    "ABCDEFGHJKLMNOPQRSTUVWXYZ",
+    "linklocal",
+    "setex",
+    "uniquelocal"
+  ],
   "WillLuke.nextjs.hasPrompted": true
 }

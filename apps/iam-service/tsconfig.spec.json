@@ -18,12 +18,14 @@
     "strict": true,
     "target": "es2022",
     "esModuleInterop": true,
+    "jsx": "react-jsx",
     "paths": {
       "@aegis/common": ["packages/index.ts"],
       "@aegis/types": ["packages/types/index.ts"],
       "@aegis/database": ["packages/database/index.ts"],
       "@aegis/auth": ["packages/auth/index.ts"],
-      "@aegis/middlewares": ["packages/middlewares/index.ts"]
+      "@aegis/middlewares": ["packages/middlewares/index.ts"],
+      "@aegis/events": ["packages/events/index.ts"]
     },
     "outDir": "./out-tsc/jest",
     "types": ["jest", "node"],

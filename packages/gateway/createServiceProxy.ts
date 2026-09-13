@@ -2,7 +2,10 @@ import { id } from 'cls-rtracer';
 import { NextFunction, Request, Response } from 'express';
 import proxy from 'express-http-proxy';
 import CircuitBreaker from 'opossum';
-import { generateInternalToken, type InternalTokenPayload } from '../auth/internal-token.js';
+import {
+  generateInternalToken,
+  type InternalTokenPayload,
+} from '../auth/internal-token.js';
 import { logger } from '../utils/logger.js';
 
 interface ServiceProxyOptions {
@@ -99,7 +102,21 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       if (res.headersSent) {
         return;
       }
+
+      if (err.code === 'ETIMEDOUT') {
+        res.status(504).json({
+          status: 'error',
+          statusCode: 504,
+          error: `Gateway Timeout: ${serviceName} did not respond within ${timeout}ms`,
+          code: 'GATEWAY_TIMEOUT',
+          details: err.message,
+        });
+        return;
+      }
+
       res.status(503).json({
+        status: 'error',
+        statusCode: 503,
         error: `${serviceName} is temporarily unavailable. Please try again later.`,
         code: err.code === 'EOPEN' ? 'CIRCUIT_OPEN' : 'SERVICE_UNAVAILABLE',
         details: err.message,

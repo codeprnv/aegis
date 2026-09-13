@@ -5,7 +5,7 @@ import {
   canUsePassword,
   isPasswordReused,
   validateAndStorePassword,
-} from '../services/password-history.service';
+} from '../services/password/password-history.service';
 
 // Mock functions
 jest.mock('@aegis/database', () => ({

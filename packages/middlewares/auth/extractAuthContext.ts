@@ -30,7 +30,9 @@ export const extractAuthContext = async (
     // If token has a sessionId, verify against the edge revocation blocklist
     if (decodedToken.sessionId) {
       try {
-        const isRevoked = await redis.get(`aegis:revoked:session:${decodedToken.sessionId}`);
+        const isRevoked = await redis.get(
+          `aegis:revoked:session:${decodedToken.sessionId}`
+        );
         if (isRevoked) {
           res.status(401).json({
             status: 'error',
@@ -40,10 +42,15 @@ export const extractAuthContext = async (
           return;
         }
       } catch (redisError) {
-        // Fail-safe resilience: log the Redis error without terminating the request
-        logger.warn(
-          { error: redisError, sessionId: decodedToken.sessionId },
-          'Edge session revocation cache lookup failed; proceeding with valid JWT'
+        // Fail-safe resilience: log a high-priority operational alert without crashing the edge
+        logger.error(
+          {
+            alert: "EDGE_REVOCATION_BYPASS_ACTIVE",
+            securityRisk: "HIGH",
+            sessionId: decodedToken.sessionId,
+            error: redisError
+          },
+          'CRITICAL: Edge session revocation cache unreachable - fallback to raw JWT verification active'
         );
       }
     }
