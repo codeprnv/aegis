@@ -29,6 +29,7 @@ export const sendEmail = async (
       subject = 'Welcome to Aegis Security';
       reactElement = React.createElement(WelcomeEmail, {
         username: payload.username,
+        loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
       });
       break;
     case NotificationEvent.EMAIL_VERIFICATION_REQUESTED:
@@ -40,29 +41,33 @@ export const sendEmail = async (
       });
       break;
     case NotificationEvent.PASSWORD_RESET_REQUESTED:
-      subject = 'Security Alert: Credentials Modification';
+      subject = 'Your Password Reset Code';
       reactElement = React.createElement(PasswordReset, {
         username: payload.username,
         otp: payload.otp,
+        resetUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`,
       });
       break;
     case NotificationEvent.PASSWORD_CHANGED:
-      subject = 'Credentials Modification Confirmed';
+      subject = 'Your Aegis Password Was Changed';
       reactElement = React.createElement(PasswordChanged, {
         username: payload.username,
+        loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
       });
       break;
     case NotificationEvent.PASSWORD_RESET_COMPLETED:
       subject = 'Password Reset Completed';
       reactElement = React.createElement(PasswordResetConfirmed, {
         username: payload.username,
+        loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
       });
       break;
     case NotificationEvent.ADMIN_PASSWORD_RESET:
-      subject = 'Administrator Action: Temporary Credentials Issued';
+      subject = 'Your Temporary Password for Aegis';
       reactElement = React.createElement(AdminPasswordReset, {
         username: payload.username,
         temporaryPassword: payload.temporaryPassword,
+        loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
       });
       break;
     default:

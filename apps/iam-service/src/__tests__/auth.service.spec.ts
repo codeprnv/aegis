@@ -46,6 +46,7 @@ jest.mock('@aegis/common', () => ({
 }));
 
 jest.mock('@aegis/auth', () => ({
+  ...jest.requireActual('@aegis/auth'),
   generateAccessToken: jest.fn().mockReturnValue('mock-access-token'),
   generateRefreshToken: jest.fn().mockReturnValue('mock-refresh-token'),
 }));
@@ -164,5 +165,44 @@ describe('Auth Service - loginUser', () => {
     ).rejects.toThrow(ForbiddenError);
 
     expect(recordFailedAttempt).toHaveBeenCalled();
+  });
+
+  it('should return restricted token when user has forcePasswordChange set and temporary password is valid (< 24h)', async () => {
+    const tempUser = {
+      ...mockUser,
+      forcePasswordChange: true,
+      passwordChangedAt: new Date(),
+    };
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(tempUser);
+    (isAccountLocked as jest.Mock).mockResolvedValue({ locked: false });
+    (verifyPassword as jest.Mock).mockResolvedValue(true);
+
+    const result = await loginUser({
+      email: 'test@example.com',
+      password: 'valid-temp-password',
+    });
+
+    expect(result.requiresPasswordChange).toBe(true);
+    expect(result).toHaveProperty('accessToken');
+    expect(result.message).toContain('You must change your temporary password');
+  });
+
+  it('should throw UnauthorizedError when temporary password has expired (> 24h)', async () => {
+    const expiredDate = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+    const expiredTempUser = {
+      ...mockUser,
+      forcePasswordChange: true,
+      passwordChangedAt: expiredDate,
+    };
+    (prisma.user.findUnique as jest.Mock).mockResolvedValue(expiredTempUser);
+    (isAccountLocked as jest.Mock).mockResolvedValue({ locked: false });
+    (verifyPassword as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      loginUser({
+        email: 'test@example.com',
+        password: 'valid-temp-password',
+      })
+    ).rejects.toThrow(UnauthorizedError);
   });
 });

@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { Heading, Text, Img } from '@react-email/components';
+import { Heading } from '@react-email/components';
 
 export const Header = () => {
   return (

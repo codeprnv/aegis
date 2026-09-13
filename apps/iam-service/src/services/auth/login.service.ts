@@ -1,7 +1,15 @@
-import { hashTokenSHA256, verifyPassword } from '@aegis/common';
+import {
+  DUMMY_ARGON2_HASH,
+  hashTokenSHA256,
+  verifyPassword,
+} from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { ForbiddenError, UnauthorizedError } from '@aegis/middlewares';
 import { randomUUID } from 'crypto';
+import {
+  IAM_PASSWORD_CONFIG,
+  IAM_TRANSACTION_OPTIONS,
+} from '../../config/index.js';
 import type { AuthResponse, LoginInput } from '../../types/auth.types';
 import {
   deriveDeviceFingerprint,
@@ -18,13 +26,6 @@ import {
   issueRestrictedToken,
   issueSessionTokenPair,
 } from './token-issuance.service';
-
-/**
- * Pre-computed static Argon2id hash used to perform constant-time dummy verifications
- * for non-existent users, eliminating user-enumeration timing side-channels (SEC-06).
- */
-const DUMMY_ARGON2_HASH =
-  '$argon2id$v=19$m=65536,t=3,p=4$dHVtbXlzYWx0MTIzNDU2$O6bN61VdE5dJz8uUv4bS4A';
 
 /**
  * Authenticates user credentials, enforces pre-auth account lockout, applies constant-time
@@ -57,6 +58,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       emailVerified: true,
       forcePasswordChange: true,
       passwordHash: true,
+      passwordChangedAt: true,
     },
   });
 
@@ -89,6 +91,19 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
 
   // Scoped token intercept for forced password change workflows (SEC-05)
   if (user.forcePasswordChange) {
+    if (user.passwordChangedAt) {
+      const expiryMs =
+        IAM_PASSWORD_CONFIG.ADMIN_TEMP_PASSWORD.EXPIRY_HOURS * 60 * 60 * 1000;
+      const isExpired =
+        Date.now() - user.passwordChangedAt.getTime() > expiryMs;
+
+      if (isExpired) {
+        throw new UnauthorizedError(
+          'Temporary password has expired. Please contact an administrator to re-issue credentials.'
+        );
+      }
+    }
+
     const temporaryToken = issueRestrictedToken({
       userId: user.id,
       email: user.email,
@@ -143,7 +158,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
       browserName: deviceInfo.browserName,
       browserVersion: deviceInfo.browserVersion,
     });
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   // Multi-factor fingerprint salting to prevent WebKit/Gecko entropy starvation (SEC-03)
   const serverFingerprint = deriveDeviceFingerprint(
