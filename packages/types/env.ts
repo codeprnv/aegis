@@ -27,6 +27,9 @@ export const apiGatewayEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  ALLOWED_ORIGINS: z.coerce
+    .string<string>()
+    .default('http://localhost:3000'),
   IAM_SERVICE_PORT: z.coerce.number<number>().default(6000),
 });
 
@@ -50,7 +53,11 @@ export const iamServiceEnvSchema = downstreamServiceBase.extend({
 });
 
 export const notificationServiceEnvSchema = downstreamServiceBase.extend({
+  NOTIFICATION_SERVICE_PORT: z.coerce.number<number>().default(6001),
   RESEND_API_KEY: z.coerce.string<string>(),
+  RESEND_FROM_EMAIL: z.coerce
+    .string<string>()
+    .default('Aegis Security <noreply@codeprnv.org>'),
   UPSTASH_REDIS_REST_URL: z.coerce.string<string>(),
   UPSTASH_REDIS_REST_TOKEN: z.coerce.string<string>(),
   UPSTASH_REDIS_URL: z.coerce.string<string>().optional(),

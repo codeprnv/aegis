@@ -14,8 +14,8 @@ const env = apiGatewayEnvSchema.parse(process.env);
 
 Object.freeze(env);
 
-import { createServiceProxy, logger } from '@aegis/common';
-import { prisma } from '@aegis/database';
+import { HTTP_HEADERS, HTTP_STATUS, logger } from '@aegis/common';
+import { createServiceProxy } from '@aegis/gateway';
 import {
   accessLogger,
   errorMiddleware,
@@ -27,13 +27,17 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import 'express-async-errors';
-import { authRateLimiter, rateLimiter } from './utils/rate-limit';
+import {
+  GATEWAY_PROXY_CONFIG,
+  GATEWAY_RATE_LIMIT_CONFIG,
+  GATEWAY_ROUTES,
+} from './config/index.js';
+import { authRateLimiter, rateLimiter } from './utils/rate-limit.js';
 
 const {
   HOST: host,
   API_GATEWAY_PORT: port,
   ORIGIN_HOST_1: origin,
-  // NODE_ENV: nodeEnv,
   IAM_SERVICE_PORT: iamServicePort,
 } = env;
 const app = express();
@@ -65,8 +69,8 @@ app.use(
   })
 );
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((item) => item.trim())
+const allowedOrigins = env.ALLOWED_ORIGINS
+  ? env.ALLOWED_ORIGINS.split(',').map((item) => item.trim())
   : [origin];
 
 app.use(
@@ -74,8 +78,8 @@ app.use(
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'authorization'],
-    exposedHeaders: ['X-Correlation-Id'],
+    allowedHeaders: ['Content-Type', HTTP_HEADERS.AUTHORIZATION],
+    exposedHeaders: [HTTP_HEADERS.CORRELATION_ID],
   })
 );
 
@@ -87,7 +91,7 @@ app.use(extractAuthContext);
 // General Rate Limiter - 50 request per 15 minutes
 app.use(rateLimiter);
 
-app.get('/gateway-health', (req, res) => {
+app.get(GATEWAY_ROUTES.HEALTH, (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -95,18 +99,14 @@ app.get('/gateway-health', (req, res) => {
     version: process.env.npm_package_version || 'unknown',
   });
 });
-// Readiness probe (check downstream services)
-app.get('/ready', async (req, res) => {
-  // Add checks for database, cache, or downstream services
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ ready: true });
-  } catch (_error) {
-    res.status(503).json({ ready: false, error: 'Database connection failed' });
-  }
+
+// Readiness probe (stateless reverse proxy runtime check)
+app.get(GATEWAY_ROUTES.READY, (req, res) => {
+  res.json({ ready: true, uptime: process.uptime() });
 });
+
 // Liveness probe
-app.get('/live', (req, res) => {
+app.get(GATEWAY_ROUTES.LIVE, (req, res) => {
   res.json({ alive: true });
 });
 
@@ -115,49 +115,36 @@ const v1Router = express.Router();
 
 // Auth Rate Limiter - DDoS protection (must be BEFORE proxy)
 // Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
-v1Router.use(
-  /^\/auth\/(login|register|reset-password|forgot-password)\/?$/i,
-  authRateLimiter
-);
+v1Router.use(GATEWAY_RATE_LIMIT_CONFIG.AUTH_ROUTE_REGEX, authRateLimiter);
 
 v1Router.use(
-  '/auth',
+  GATEWAY_ROUTES.AUTH,
   createServiceProxy({
-    serviceName: 'iam-service',
+    serviceName: GATEWAY_PROXY_CONFIG.IAM_SERVICE.name,
     serviceUrl: `${host}:${iamServicePort}`,
-    timeout: 5000,
-    circuitBreaker: {
-      enabled: true,
-      resetTimeout: 20000,
-      errorThreshold: 75,
-    },
+    timeout: GATEWAY_PROXY_CONFIG.IAM_SERVICE.timeoutMs,
+    circuitBreaker: GATEWAY_PROXY_CONFIG.IAM_SERVICE.circuitBreaker,
     proxyReqPathResolver: (req) => {
-      // Upstream expects /internal/v1/auth
-      return `/internal/v1/auth${req.url}`;
+      return `${GATEWAY_ROUTES.UPSTREAM_IAM_AUTH_PREFIX}${req.url}`;
     },
   })
 );
 
 v1Router.use(
-  '/admin',
+  GATEWAY_ROUTES.ADMIN,
   createServiceProxy({
-    serviceName: 'iam-service',
+    serviceName: GATEWAY_PROXY_CONFIG.IAM_SERVICE.name,
     serviceUrl: `${host}:${iamServicePort}`,
-    timeout: 5000,
-    circuitBreaker: {
-      enabled: true,
-      resetTimeout: 20000,
-      errorThreshold: 75,
-    },
+    timeout: GATEWAY_PROXY_CONFIG.IAM_SERVICE.timeoutMs,
+    circuitBreaker: GATEWAY_PROXY_CONFIG.IAM_SERVICE.circuitBreaker,
     proxyReqPathResolver: (req) => {
-      // Upstream expects /internal/v1/admin
-      return `/internal/v1/admin${req.url}`;
+      return `${GATEWAY_ROUTES.UPSTREAM_IAM_ADMIN_PREFIX}${req.url}`;
     },
   })
 );
 
 // Mount v1 router
-app.use('/v1', v1Router);
+app.use(GATEWAY_ROUTES.V1_PREFIX, v1Router);
 
 app.use(errorMiddleware);
 

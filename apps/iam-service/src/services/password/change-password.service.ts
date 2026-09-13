@@ -2,6 +2,7 @@ import { logger, validatePassword, verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError } from '@aegis/middlewares';
+import { SESSION_REVOCATION_REASONS } from '../../config/index.js';
 import {
   canUsePassword,
   validateAndStorePassword,
@@ -74,7 +75,7 @@ export const changePassword = async (
     },
     data: {
       revokedAt: new Date(),
-      revokedReason: 'Password change by user',
+      revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_CHANGE_BY_USER,
     },
   });
 

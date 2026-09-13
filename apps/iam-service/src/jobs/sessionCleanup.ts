@@ -1,12 +1,15 @@
 import { logger } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import cron from 'node-cron';
+import { IAM_SESSION_CONFIG } from '../config/index.js';
 
 export async function cleanupExpiredSessions() {
   try {
-    const cutOfDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 Days
+    const cutOfDate = new Date(
+      Date.now() - IAM_SESSION_CONFIG.RETENTION_WINDOWS.EXPIRED_SESSIONS_MS
+    );
 
-    // Delete sessions expired or revoked for more than 30 days
+    // Delete sessions expired or revoked beyond the retention threshold
     const expiredResult = await prisma.session.deleteMany({
       where: {
         OR: [
@@ -18,14 +21,19 @@ export async function cleanupExpiredSessions() {
       },
     });
 
-    //   Delete old password resets
+    // Delete completed password resets beyond the retention threshold
     const resetResult = await prisma.passwordReset.deleteMany({
       where: {
         OR: [
           { tokenExpiresAt: { lt: new Date() } },
           {
             otpUsed: true,
-            otpUsedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            otpUsedAt: {
+              lt: new Date(
+                Date.now() -
+                  IAM_SESSION_CONFIG.RETENTION_WINDOWS.COMPLETED_RESETS_MS
+              ),
+            },
           },
         ],
       },
@@ -51,12 +59,12 @@ export async function cleanupExpiredSessions() {
   }
 }
 
-// Schedule clean daily at 2 AM
+// Schedule clean daily at configured cron schedule
 export function startSessionCleanupJob() {
-  cron.schedule('0 2 * * *', async () => {
+  cron.schedule(IAM_SESSION_CONFIG.SESSION_CLEANUP_CRON, async () => {
     logger.info('Starting scheduled session cleanup');
     await cleanupExpiredSessions();
   });
 
-  logger.info('Session cleanup job scheduled (daily at 2 AM)');
+  logger.info('Session cleanup job scheduled');
 }

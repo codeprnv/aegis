@@ -1,5 +1,11 @@
+import {
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+} from '@aegis/auth';
 import { prisma, redis } from '@aegis/database';
 import { NotFoundError, UnauthorizedError } from '@aegis/middlewares';
+import { SESSION_REVOCATION_REASONS } from '../../config/index.js';
 
 /**
  * Data transfer object representing an active session returned to the client.
@@ -37,11 +43,6 @@ export interface CreateSessionOptions {
   browserName?: string;
   browserVersion?: string;
 }
-
-/**
- * Edge blocklist time-to-live in seconds (15-minute access token lifespan + 60s clock skew buffer).
- */
-const EDGE_REVOCATION_TTL_SECONDS = 960;
 
 /**
  * Transactional helper for creating an active session record in PostgreSQL.
@@ -138,15 +139,15 @@ export const revokeSession = async (
       where: { id: sessionId },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Manual user revocation',
+        revokedReason: SESSION_REVOCATION_REASONS.MANUAL_USER_REVOCATION,
       },
     });
   }
 
   await redis.setex(
-    `aegis:revoked:session:${sessionId}`,
+    REDIS_AUTH_KEYS.REVOKED_SESSION(sessionId),
     EDGE_REVOCATION_TTL_SECONDS,
-    'revoked'
+    REDIS_REVOKED_SENTINEL
   );
 };
 
@@ -191,19 +192,19 @@ export const revokeAllOtherSessions = async (
     },
     data: {
       revokedAt: new Date(),
-      revokedReason: 'Revoke all other sessions',
+      revokedReason: SESSION_REVOCATION_REASONS.REVOKE_ALL_OTHER_SESSIONS,
     },
   });
 
   const pipeline = redis.pipeline();
   for (const id of sessionIds) {
-    const key = `aegis:revoked:session:${id}`;
+    const key = REDIS_AUTH_KEYS.REVOKED_SESSION(id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (typeof (pipeline as any).setex === 'function') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (pipeline as any).setex(key, EDGE_REVOCATION_TTL_SECONDS, 'revoked');
+      (pipeline as any).setex(key, EDGE_REVOCATION_TTL_SECONDS, REDIS_REVOKED_SENTINEL);
     } else {
-      pipeline.set(key, 'revoked', { ex: EDGE_REVOCATION_TTL_SECONDS });
+      pipeline.set(key, REDIS_REVOKED_SENTINEL, { ex: EDGE_REVOCATION_TTL_SECONDS });
     }
   }
 
@@ -235,20 +236,20 @@ export const logoutService = async (
       where: { userId, revokedAt: null },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'User logged out from all devices',
+        revokedReason: SESSION_REVOCATION_REASONS.LOGOUT_ALL_DEVICES,
       },
     });
 
     if (activeSessions.length > 0) {
       const pipeline = redis.pipeline();
       for (const session of activeSessions) {
-        const key = `aegis:revoked:session:${session.id}`;
+        const key = REDIS_AUTH_KEYS.REVOKED_SESSION(session.id);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (typeof (pipeline as any).setex === 'function') {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (pipeline as any).setex(key, EDGE_REVOCATION_TTL_SECONDS, 'revoked');
+          (pipeline as any).setex(key, EDGE_REVOCATION_TTL_SECONDS, REDIS_REVOKED_SENTINEL);
         } else {
-          pipeline.set(key, 'revoked', { ex: EDGE_REVOCATION_TTL_SECONDS });
+          pipeline.set(key, REDIS_REVOKED_SENTINEL, { ex: EDGE_REVOCATION_TTL_SECONDS });
         }
       }
       await pipeline.exec();
@@ -261,14 +262,14 @@ export const logoutService = async (
       },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'User logged out',
+        revokedReason: SESSION_REVOCATION_REASONS.MANUAL_USER_LOGOUT,
       },
     });
 
     await redis.setex(
-      `aegis:revoked:session:${sessionId}`,
+      REDIS_AUTH_KEYS.REVOKED_SESSION(sessionId),
       EDGE_REVOCATION_TTL_SECONDS,
-      'revoked'
+      REDIS_REVOKED_SENTINEL
     );
   }
 };

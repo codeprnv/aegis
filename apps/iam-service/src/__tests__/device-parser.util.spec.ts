@@ -13,7 +13,7 @@ describe('Device Parser Utility', () => {
 
       expect(result.deviceType).toBe('desktop');
       expect(result.browserName).toBe('Chrome');
-      expect(result.osName).toBe('Mac OS');
+      expect(result.osName).toBe('macOS');
     });
 
     it('should correctly parse mobile user agents', () => {

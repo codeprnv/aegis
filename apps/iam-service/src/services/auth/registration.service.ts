@@ -1,3 +1,4 @@
+import { AUTH_ROLES } from '@aegis/auth';
 import {
   hashPassword,
   hashTokenSHA256,
@@ -6,6 +7,10 @@ import {
 import { prisma, redis } from '@aegis/database';
 import { BadRequestError, ConflictError } from '@aegis/middlewares';
 import { randomBytes, randomUUID } from 'crypto';
+import {
+  IAM_REGISTRATION_CONFIG,
+  REDIS_REGISTRATION_KEYS,
+} from '../../config/index.js';
 import type { AuthResponse, RegisterInput } from '../../types/auth.types';
 import {
   deriveDeviceFingerprint,
@@ -53,9 +58,11 @@ export const registerUser = async (
     );
   }
 
-  const pendingByEmail = await redis.get(`registration:email:${email}`);
+  const pendingByEmail = await redis.get(
+    REDIS_REGISTRATION_KEYS.PENDING_EMAIL(email)
+  );
   const pendingByUsername = await redis.get(
-    `registration:username:${username}`
+    REDIS_REGISTRATION_KEYS.PENDING_USERNAME(username)
   );
 
   if (pendingByEmail || pendingByUsername) {
@@ -65,7 +72,9 @@ export const registerUser = async (
   }
 
   const passwordHash = await hashPassword(password);
-  const rawVerificationToken = randomBytes(32).toString('hex');
+  const rawVerificationToken = randomBytes(
+    IAM_REGISTRATION_CONFIG.TOKEN_BYTE_LENGTH
+  ).toString('hex');
   const tokenHash = hashTokenSHA256(rawVerificationToken);
 
   const pendingUserData = {
@@ -77,9 +86,21 @@ export const registerUser = async (
     ipAddress,
   };
 
-  await redis.setex(`registration:${tokenHash}`, 86400, pendingUserData);
-  await redis.setex(`registration:email:${email}`, 86400, tokenHash);
-  await redis.setex(`registration:username:${username}`, 86400, tokenHash);
+  await redis.setex(
+    REDIS_REGISTRATION_KEYS.PENDING_PAYLOAD(tokenHash),
+    IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
+    pendingUserData
+  );
+  await redis.setex(
+    REDIS_REGISTRATION_KEYS.PENDING_EMAIL(email),
+    IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
+    tokenHash
+  );
+  await redis.setex(
+    REDIS_REGISTRATION_KEYS.PENDING_USERNAME(username),
+    IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
+    tokenHash
+  );
 
   publishEmailVerificationRequested({
     userId: 'pending',
@@ -107,7 +128,7 @@ export const verifyEmailService = async (
   token: string
 ): Promise<AuthResponse> => {
   const tokenHash = hashTokenSHA256(token);
-  const redisKey = `registration:${tokenHash}`;
+  const redisKey = REDIS_REGISTRATION_KEYS.PENDING_PAYLOAD(tokenHash);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pendingData = await redis.get<any>(redisKey);
 
@@ -124,7 +145,7 @@ export const verifyEmailService = async (
     issueSessionTokenPair({
       userId,
       email: pendingData.email,
-      role: 'USER',
+      role: AUTH_ROLES.USER,
       sessionId,
     });
 
@@ -139,7 +160,7 @@ export const verifyEmailService = async (
         email: pendingData.email,
         passwordHash: pendingData.passwordHash,
         mobile: pendingData.mobile || null,
-        role: 'USER',
+        role: AUTH_ROLES.USER,
         emailVerified: true,
         emailVerifiedAt: new Date(),
         passwordHistory: {
@@ -192,8 +213,8 @@ export const verifyEmailService = async (
   // Purge Redis staging keys ONLY AFTER PostgreSQL transaction succeeds (SEC-02)
   await redis.del(
     redisKey,
-    `registration:email:${pendingData.email}`,
-    `registration:username:${pendingData.username}`
+    REDIS_REGISTRATION_KEYS.PENDING_EMAIL(pendingData.email),
+    REDIS_REGISTRATION_KEYS.PENDING_USERNAME(pendingData.username)
   );
 
   publishUserRegistered({

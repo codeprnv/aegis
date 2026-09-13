@@ -1,15 +1,15 @@
 import { logger } from '@aegis/common';
 import { notificationPrisma } from '@aegis/database';
-import { createBullMQConnection } from '@aegis/events';
+import { createBullMQConnection, NOTIFICATION_QUEUE_NAME } from '@aegis/events';
+import { NotificationStatus } from '@aegis/types';
 import { Job, Worker } from 'bullmq';
 import { sendEmail } from '../channels/email.channel';
-
-const QUEUE_NAME = 'aegis-notifications';
+import { NOTIFICATION_WORKER_CONFIG } from '../config/index.js';
 
 export const startEmailWorker = (): Worker => {
   logger.info(`Starting BullMQ Email Worker...`);
   const worker = new Worker(
-    QUEUE_NAME,
+    NOTIFICATION_QUEUE_NAME,
     async (job: Job) => {
       logger.info(`Processing job ${job.id} (Event: ${job.name})`);
 
@@ -20,7 +20,10 @@ export const startEmailWorker = (): Worker => {
             where: { idempotencyKey: job.id! },
           });
 
-        if (existingNotification && existingNotification.status === 'sent') {
+        if (
+          existingNotification &&
+          existingNotification.status === NotificationStatus.SENT
+        ) {
           logger.info(`Job ${job.id} already processed. Skipping.`);
           return;
         }
@@ -34,7 +37,7 @@ export const startEmailWorker = (): Worker => {
               recipientId: job.data.userId || 'unknown',
               recipientEmail: job.data.email,
               idempotencyKey: job.id!,
-              status: 'pending',
+              status: NotificationStatus.PENDING,
               attempts: 1,
               lastAttemptAt: new Date(),
             },
@@ -56,7 +59,7 @@ export const startEmailWorker = (): Worker => {
         await notificationPrisma.notification.update({
           where: { id: notificationId },
           data: {
-            status: 'sent',
+            status: NotificationStatus.SENT,
             sentAt: new Date(),
             providerMessageId: providerMessageId,
           },
@@ -72,7 +75,7 @@ export const startEmailWorker = (): Worker => {
             .updateMany({
               where: { idempotencyKey: job.id },
               data: {
-                status: 'failed',
+                status: NotificationStatus.FAILED,
                 errorMessage:
                   error instanceof Error ? error.message : String(error),
               },
@@ -90,8 +93,8 @@ export const startEmailWorker = (): Worker => {
     },
     {
       connection: createBullMQConnection() as any,
-      drainDelay: 60,
-      concurrency: 5,
+      drainDelay: NOTIFICATION_WORKER_CONFIG.DRAIN_DELAY_SECONDS,
+      concurrency: NOTIFICATION_WORKER_CONFIG.CONCURRENCY,
     }
   );
 

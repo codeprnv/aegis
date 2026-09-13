@@ -1,6 +1,6 @@
 process.env.SERVICE_NAME = 'iam-service';
 
-import { logger } from '@aegis/common';
+import { logger, SERVICE_NAMES } from '@aegis/common';
 import { iamServiceEnvSchema } from '@aegis/types';
 import dotenv from 'dotenv';
 
@@ -45,7 +45,7 @@ app.use(express.urlencoded({ limit: '2mb', extended: true }));
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
-    service: 'iam-service',
+    service: SERVICE_NAMES.IAM,
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
@@ -66,7 +66,7 @@ app.get('/live', (req, res) => {
   res.json({ alive: true });
 });
 
-app.use('/internal', requireInternalToken('iam-service'));
+app.use('/internal', requireInternalToken(SERVICE_NAMES.IAM));
 
 const v1Router = express.Router();
 

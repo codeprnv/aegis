@@ -1,28 +1,22 @@
-import { verifyRefreshToken } from '@aegis/auth';
+import {
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+  verifyRefreshToken,
+} from '@aegis/auth';
 import { hashTokenSHA256 } from '@aegis/common';
 import { prisma, redis } from '@aegis/database';
 import { UnauthorizedError } from '@aegis/middlewares';
 import { randomUUID } from 'crypto';
+import {
+  IAM_SESSION_CONFIG,
+  IAM_TRANSACTION_OPTIONS,
+  REDIS_SESSION_KEYS,
+  SESSION_REVOCATION_REASONS,
+} from '../../config/index.js';
 import type { AuthResponse } from '../../types/auth.types';
 import { createSessionRecord } from '../session/session-management.service';
 import { issueSessionTokenPair } from './token-issuance.service';
-
-/**
- * Maximum absolute lifespan of any session family (30 days in milliseconds).
- * Enforces session expiration regardless of active rotation frequency (SEC-08).
- */
-const ABSOLUTE_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-
-/**
- * Edge blocklist time-to-live in seconds (15-minute access token + 60s skew buffer).
- */
-const EDGE_REVOCATION_TTL_SECONDS = 960;
-
-/**
- * Idempotent grace-period cache window in seconds.
- * Absorbs concurrent network race conditions without session branching (SEC-04).
- */
-const REFRESH_GRACE_PERIOD_SECONDS = 15;
 
 /**
  * Validates a refresh token, performs token family reuse detection, enforces
@@ -39,7 +33,7 @@ export const refreshTokenService = async (
   ipAddress?: string
 ): Promise<AuthResponse> => {
   const oldTokenHash = hashTokenSHA256(oldRefreshToken);
-  const graceCacheKey = `aegis:refresh:cache:${oldTokenHash}`;
+  const graceCacheKey = REDIS_SESSION_KEYS.REFRESH_CACHE(oldTokenHash);
 
   // Idempotent grace period check: return cached token pair for concurrent calls (SEC-04)
   const cachedTokens = await redis.get<string>(graceCacheKey);
@@ -67,7 +61,7 @@ export const refreshTokenService = async (
 
   // Refresh Token Race Guard: Check edge Redis blocklist before issuing new tokens
   const isRevokedInCache = await redis.get(
-    `aegis:revoked:session:${session.id}`
+    REDIS_AUTH_KEYS.REVOKED_SESSION(session.id)
   );
 
   if (session.revokedAt || isRevokedInCache) {
@@ -78,13 +72,13 @@ export const refreshTokenService = async (
       data: {
         isCompromised: true,
         revokedAt: new Date(),
-        revokedReason: 'Token reuse detected - potential theft',
+        revokedReason: SESSION_REVOCATION_REASONS.TOKEN_REUSE_DETECTED,
       },
     });
     await redis.setex(
-      `aegis:revoked:session:${session.id}`,
+      REDIS_AUTH_KEYS.REVOKED_SESSION(session.id),
       EDGE_REVOCATION_TTL_SECONDS,
-      'revoked'
+      REDIS_REVOKED_SENTINEL
     );
     throw new UnauthorizedError('Refresh token reuse detected!');
   }
@@ -95,18 +89,18 @@ export const refreshTokenService = async (
 
   // Absolute session family lifetime cap (SEC-08)
   const sessionAgeMs = Date.now() - session.createdAt.getTime();
-  if (sessionAgeMs > ABSOLUTE_SESSION_MAX_AGE_MS) {
+  if (sessionAgeMs > IAM_SESSION_CONFIG.ABSOLUTE_SESSION_MAX_AGE_MS) {
     await prisma.session.updateMany({
       where: { tokenFamily: session.tokenFamily },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Session reached absolute 30-day lifetime cap',
+        revokedReason: SESSION_REVOCATION_REASONS.ABSOLUTE_LIFETIME_CAP,
       },
     });
     await redis.setex(
-      `aegis:revoked:session:${session.id}`,
+      REDIS_AUTH_KEYS.REVOKED_SESSION(session.id),
       EDGE_REVOCATION_TTL_SECONDS,
-      'revoked'
+      REDIS_REVOKED_SENTINEL
     );
     throw new UnauthorizedError('Session expired. Please log in again.');
   }
@@ -159,7 +153,7 @@ export const refreshTokenService = async (
       },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Token rotation',
+        revokedReason: SESSION_REVOCATION_REASONS.TOKEN_ROTATION,
       },
     });
 
@@ -170,7 +164,7 @@ export const refreshTokenService = async (
         data: {
           isCompromised: true,
           revokedAt: new Date(),
-          revokedReason: 'Token reuse detected - potential theft',
+          revokedReason: SESSION_REVOCATION_REASONS.TOKEN_REUSE_DETECTED,
         },
       });
       throw new UnauthorizedError('Refresh token reuse detected!');
@@ -198,13 +192,13 @@ export const refreshTokenService = async (
       browserName: validSession.browserName || undefined,
       browserVersion: validSession.browserVersion || undefined,
     });
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   // Explicit stateless edge Redis blocklist write for old rotated session (SEC-01)
   await redis.setex(
-    `aegis:revoked:session:${validSession.id}`,
+    REDIS_AUTH_KEYS.REVOKED_SESSION(validSession.id),
     EDGE_REVOCATION_TTL_SECONDS,
-    'revoked'
+    REDIS_REVOKED_SENTINEL
   );
 
   const responsePayload: AuthResponse = {
@@ -217,7 +211,7 @@ export const refreshTokenService = async (
   // Cache response for idempotent grace period handling (SEC-04)
   await redis.setex(
     graceCacheKey,
-    REFRESH_GRACE_PERIOD_SECONDS,
+    IAM_SESSION_CONFIG.REFRESH_GRACE_PERIOD_SECONDS,
     JSON.stringify(responsePayload)
   );
 

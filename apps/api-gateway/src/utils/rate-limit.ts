@@ -1,7 +1,7 @@
-import { AUTH_CONFIG } from '@aegis/common';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import RedisClient from 'ioredis';
 import { RedisStore } from 'rate-limit-redis';
+import { GATEWAY_RATE_LIMIT_CONFIG } from '../config/gateway.ratelimit.config.js';
 
 const redisClient = new RedisClient(
   process.env.REDIS_URL || 'redis://localhost:6379'
@@ -9,17 +9,13 @@ const redisClient = new RedisClient(
 
 export const rateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-    prefix: 'aegis:gateway:rl:',
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
+    prefix: GATEWAY_RATE_LIMIT_CONFIG.GLOBAL.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.WINDOW_MS,
-  max: AUTH_CONFIG.RATE_LIMIT.MAX_REQUESTS,
-  message: {
-    status: 'error',
-    statusCode: 429,
-    message:
-      'Too many requests from this IP, please try again after 15 minutes',
-  },
+  windowMs: GATEWAY_RATE_LIMIT_CONFIG.GLOBAL.WINDOW_MS,
+  max: GATEWAY_RATE_LIMIT_CONFIG.GLOBAL.MAX_REQUESTS,
+  message: GATEWAY_RATE_LIMIT_CONFIG.GLOBAL.MESSAGE,
   legacyHeaders: true,
   keyGenerator: (req) => {
     const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
@@ -29,17 +25,13 @@ export const rateLimiter = rateLimit({
 
 export const authRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-    prefix: 'aegis:gateway:rl:auth:',
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
+    prefix: GATEWAY_RATE_LIMIT_CONFIG.AUTH.REDIS_PREFIX,
   }),
-  windowMs: 60 * 1000,
-  max: 50,
-  message: {
-    status: 'error',
-    statusCode: 429,
-    message:
-      'Too many requests to authentication endpoints. Please try again later.',
-  },
+  windowMs: GATEWAY_RATE_LIMIT_CONFIG.AUTH.WINDOW_MS,
+  max: GATEWAY_RATE_LIMIT_CONFIG.AUTH.MAX_REQUESTS,
+  message: GATEWAY_RATE_LIMIT_CONFIG.AUTH.MESSAGE,
   legacyHeaders: true,
   keyGenerator: (req) => {
     const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';

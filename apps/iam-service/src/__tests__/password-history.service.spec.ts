@@ -1,6 +1,7 @@
-import { AUTH_CONFIG, hashPassword, verifyPassword } from '@aegis/common';
+import { hashPassword, verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { ConflictError } from '@aegis/middlewares';
+import { IAM_PASSWORD_CONFIG } from '../config/index.js';
 import {
   canUsePassword,
   isPasswordReused,
@@ -23,9 +24,7 @@ jest.mock('@aegis/database', () => ({
 }));
 
 jest.mock('@aegis/common', () => ({
-  AUTH_CONFIG: {
-    PASSWORD_HISTORY_LIMIT: 5,
-  },
+  ...jest.requireActual('@aegis/common'),
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -63,7 +62,7 @@ describe('Password History Service', () => {
       expect(prisma.passwordHistory.findMany).toHaveBeenCalledWith({
         where: { userId },
         orderBy: { changedAt: 'desc' },
-        take: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+        take: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
         select: {
           passwordHash: true,
           changedAt: true,
@@ -191,7 +190,10 @@ describe('Password History Service', () => {
       );
       await validateAndStorePassword(userId, newPassword);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.anything()
+      );
     });
   });
 
@@ -224,12 +226,12 @@ describe('Password History Service', () => {
         .mockResolvedValue(true);
 
       await expect(canUsePassword(userId, newPassword)).rejects.toThrow(
-        `Cannot reuse any of your last ${AUTH_CONFIG.PASSWORD_HISTORY_LIMIT} password(s)`
+        `Cannot reuse any of your last ${IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT} password(s)`
       );
     });
 
     it('should check against configured history limit', async () => {
-      const mockHistory = Array(AUTH_CONFIG.PASSWORD_HISTORY_LIMIT)
+      const mockHistory = Array(IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT)
         .fill(null)
         .map(() => ({
           passwordHash: 'hash',
@@ -246,7 +248,7 @@ describe('Password History Service', () => {
       expect(prisma.passwordHistory.findMany).toHaveBeenCalledWith({
         where: { userId },
         orderBy: { changedAt: 'desc' },
-        take: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+        take: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
         select: expect.any(Object),
       });
     });

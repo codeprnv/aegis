@@ -3,10 +3,13 @@ import { NextFunction, Request, Response } from 'express';
 import proxy from 'express-http-proxy';
 import CircuitBreaker from 'opossum';
 import {
+  AUTH_ROLES,
+  SENTINEL_USERS,
   generateInternalToken,
   type InternalTokenPayload,
-} from '../auth/internal-token.js';
-import { logger } from '../utils/logger.js';
+} from '@aegis/auth';
+import { HTTP_HEADERS, HTTP_STATUS, logger } from '@aegis/common';
+import { GATEWAY_ERROR_CODES, PROXY_DEFAULTS } from './constants.js';
 
 interface ServiceProxyOptions {
   serviceName: string; // Target service name for internal token audience
@@ -31,7 +34,7 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
   const {
     serviceName,
     serviceUrl,
-    timeout = 5000,
+    timeout = PROXY_DEFAULTS.TIMEOUT_MS,
     circuitBreaker = { enabled: true },
     proxyReqPathResolver,
   } = options;
@@ -45,17 +48,17 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       if (!proxyReqOpts.headers) {
         proxyReqOpts.headers = {};
       }
-      proxyReqOpts.headers['X-Correlation-Id'] = String(id() ?? '');
+      proxyReqOpts.headers[HTTP_HEADERS.CORRELATION_ID] = String(id() ?? '');
 
       // Generate the internal token with user context (including active sessionId)
       const payload: Omit<InternalTokenPayload, 'aud'> = {
-        sub: srcReq.auth?.id || 'anonymous',
-        role: srcReq.auth?.role || 'guest',
+        sub: srcReq.auth?.id || SENTINEL_USERS.ANONYMOUS,
+        role: srcReq.auth?.role || AUTH_ROLES.GUEST,
         ...(srcReq.auth?.sessionId ? { sessionId: srcReq.auth.sessionId } : {}),
       };
       try {
         const internalToken = generateInternalToken(payload, serviceName);
-        proxyReqOpts.headers['authorization'] = `Bearer ${internalToken}`;
+        proxyReqOpts.headers[HTTP_HEADERS.AUTHORIZATION] = `Bearer ${internalToken}`;
       } catch (error) {
         logger.error(
           { error, serviceName },
@@ -91,8 +94,12 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
     },
     {
       timeout,
-      errorThresholdPercentage: circuitBreaker.errorThreshold ?? 50,
-      resetTimeout: circuitBreaker.resetTimeout ?? 30000,
+      errorThresholdPercentage:
+        circuitBreaker.errorThreshold ??
+        PROXY_DEFAULTS.CIRCUIT_BREAKER_ERROR_THRESHOLD_PERCENT,
+      resetTimeout:
+        circuitBreaker.resetTimeout ??
+        PROXY_DEFAULTS.CIRCUIT_BREAKER_RESET_TIMEOUT_MS,
     }
   );
 
@@ -104,21 +111,24 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       }
 
       if (err.code === 'ETIMEDOUT') {
-        res.status(504).json({
+        res.status(HTTP_STATUS.GATEWAY_TIMEOUT).json({
           status: 'error',
-          statusCode: 504,
+          statusCode: HTTP_STATUS.GATEWAY_TIMEOUT,
           error: `Gateway Timeout: ${serviceName} did not respond within ${timeout}ms`,
-          code: 'GATEWAY_TIMEOUT',
+          code: GATEWAY_ERROR_CODES.GATEWAY_TIMEOUT,
           details: err.message,
         });
         return;
       }
 
-      res.status(503).json({
+      res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({
         status: 'error',
-        statusCode: 503,
+        statusCode: HTTP_STATUS.SERVICE_UNAVAILABLE,
         error: `${serviceName} is temporarily unavailable. Please try again later.`,
-        code: err.code === 'EOPEN' ? 'CIRCUIT_OPEN' : 'SERVICE_UNAVAILABLE',
+        code:
+          err.code === 'EOPEN'
+            ? GATEWAY_ERROR_CODES.CIRCUIT_OPEN
+            : GATEWAY_ERROR_CODES.SERVICE_UNAVAILABLE,
         details: err.message,
       });
     });

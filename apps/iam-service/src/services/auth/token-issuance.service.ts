@@ -1,5 +1,12 @@
-import { generateAccessToken, generateRefreshToken } from '@aegis/auth';
-import { AUTH_CONFIG, hashTokenSHA256 } from '@aegis/common';
+import {
+  AUTH_ROLES,
+  generateAccessToken,
+  generateRefreshToken,
+  JWT_AUDIENCES,
+  JWT_ISSUERS,
+  TOKEN_EXPIRATIONS,
+} from '@aegis/auth';
+import { hashTokenSHA256 } from '@aegis/common';
 
 /**
  * Input parameters required to mint a standard session token pair.
@@ -50,13 +57,13 @@ export const issueSessionTokenPair = (
       role,
       sessionId,
     },
-    'iam-service',
-    'aegis-client'
+    JWT_ISSUERS.IAM,
+    JWT_AUDIENCES.CLIENT
   );
 
   const refreshExpiryDays = rememberMe
-    ? 15
-    : AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS;
+    ? TOKEN_EXPIRATIONS.REMEMBER_ME_DAYS
+    : TOKEN_EXPIRATIONS.REFRESH_TOKEN_DAYS;
   const refreshExpiryStr = `${refreshExpiryDays}d`;
 
   const refreshToken = generateRefreshToken(
@@ -66,8 +73,8 @@ export const issueSessionTokenPair = (
       role,
       sessionId,
     },
-    'iam-service',
-    'aegis-client',
+    JWT_ISSUERS.IAM,
+    JWT_AUDIENCES.CLIENT,
     refreshExpiryStr
   );
 
@@ -96,10 +103,10 @@ export const issueRestrictedToken = (params: RestrictedTokenParams): string => {
     {
       sub: params.userId,
       email: params.email,
-      role: params.role || 'RESTRICTED',
+      role: params.role || AUTH_ROLES.RESTRICTED,
       sessionId: 'restricted-session',
     },
-    'iam-service',
-    'aegis-client'
+    JWT_ISSUERS.IAM,
+    JWT_AUDIENCES.CLIENT
   );
 };

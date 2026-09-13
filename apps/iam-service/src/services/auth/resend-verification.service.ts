@@ -2,6 +2,10 @@ import { hashTokenSHA256, logger } from '@aegis/common';
 import { redis } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { randomBytes } from 'crypto';
+import {
+  IAM_REGISTRATION_CONFIG,
+  REDIS_REGISTRATION_KEYS,
+} from '../../config/index.js';
 
 /**
  * Re-issues and dispatches a fresh email verification token for a pending registration.
@@ -13,7 +17,7 @@ export async function resendVerificationEmail(email: string): Promise<void> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
     const existingTokenHash = await redis.get<string>(
-      `registration:email:${normalizedEmail}`
+      REDIS_REGISTRATION_KEYS.PENDING_EMAIL(normalizedEmail)
     );
 
     if (!existingTokenHash) {
@@ -25,22 +29,34 @@ export async function resendVerificationEmail(email: string): Promise<void> {
     }
 
     const pendingData = await redis.get<any>(
-      `registration:${existingTokenHash}`
+      REDIS_REGISTRATION_KEYS.PENDING_PAYLOAD(existingTokenHash)
     );
     if (!pendingData) {
       logger.info({ email }, 'Pending registration data expired');
       return;
     }
 
-    const newRawToken = randomBytes(32).toString('hex');
+    const newRawToken = randomBytes(
+      IAM_REGISTRATION_CONFIG.TOKEN_BYTE_LENGTH
+    ).toString('hex');
     const newTokenHash = hashTokenSHA256(newRawToken);
 
-    await redis.del(`registration:${existingTokenHash}`);
-    await redis.setex(`registration:${newTokenHash}`, 86400, pendingData);
-    await redis.setex(`registration:email:${email}`, 86400, newTokenHash);
+    await redis.del(
+      REDIS_REGISTRATION_KEYS.PENDING_PAYLOAD(existingTokenHash)
+    );
     await redis.setex(
-      `registration:username:${pendingData.username}`,
-      86400,
+      REDIS_REGISTRATION_KEYS.PENDING_PAYLOAD(newTokenHash),
+      IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
+      pendingData
+    );
+    await redis.setex(
+      REDIS_REGISTRATION_KEYS.PENDING_EMAIL(email),
+      IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
+      newTokenHash
+    );
+    await redis.setex(
+      REDIS_REGISTRATION_KEYS.PENDING_USERNAME(pendingData.username),
+      IAM_REGISTRATION_CONFIG.STAGING_TTL_SECONDS,
       newTokenHash
     );
 

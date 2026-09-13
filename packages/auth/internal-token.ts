@@ -1,4 +1,11 @@
 import jwt from 'jsonwebtoken';
+import {
+  CLOCK_TOLERANCE_SECONDS,
+  JWT_AUDIENCES,
+  JWT_ISSUERS,
+  JWT_SIGNING_ALGORITHMS,
+  TOKEN_EXPIRATIONS,
+} from './tokens.js';
 
 // Decode once at module load, reuse on every call
 const PRIVATE_KEY: string | null = process.env.INTERNAL_JWT_PRIVATE_KEY_B64
@@ -25,17 +32,17 @@ export interface InternalTokenPayload {
  */
 export const generateInternalToken = (
   payload: Omit<InternalTokenPayload, 'aud'>,
-  audience = 'internal-service'
+  audience: string = JWT_AUDIENCES.INTERNAL
 ): string => {
   if (!PRIVATE_KEY) {
     throw new Error('INTERNAL_JWT_PRIVATE_KEY_B64 is not set. Gateway cannot sign internal tokens.');
   }
 
   return jwt.sign(payload, PRIVATE_KEY, {
-    algorithm: 'RS256',
-    expiresIn: '1m', // short-lived
+    algorithm: JWT_SIGNING_ALGORITHMS.ASYMMETRIC,
+    expiresIn: TOKEN_EXPIRATIONS.INTERNAL_TOKEN,
     audience,
-    issuer: 'aegis-gateway',
+    issuer: JWT_ISSUERS.GATEWAY,
   });
 };
 
@@ -56,10 +63,10 @@ export const verifyInternalToken = (
 
   try {
     const decoded = jwt.verify(token, PUBLIC_KEY, {
-      issuer: 'aegis-gateway',
+      issuer: JWT_ISSUERS.GATEWAY,
       audience: expectedAudience,
-      algorithms: ['RS256'],
-      clockTolerance: 5,
+      algorithms: [JWT_SIGNING_ALGORITHMS.ASYMMETRIC],
+      clockTolerance: CLOCK_TOLERANCE_SECONDS,
     }) as InternalTokenPayload;
     return decoded;
   } catch (_error) {

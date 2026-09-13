@@ -1,4 +1,4 @@
-import { AUTH_CONFIG, logger, REDIS_KEYS } from '@aegis/common';
+import { logger } from '@aegis/common';
 import {
   prisma,
   clearLockout as redisClearLockout,
@@ -8,6 +8,7 @@ import {
   resetCounter as redisResetCounter,
   setLockout as redisSetLockout,
 } from '@aegis/database';
+import { IAM_LOCKOUT_CONFIG, REDIS_LOCKOUT_KEYS } from '../../config/index.js';
 
 /**
  * Result structure of an account lockout status inquiry.
@@ -28,7 +29,7 @@ export interface AccountLockoutStatus {
 export const isAccountLocked = async (
   email: string
 ): Promise<AccountLockoutStatus> => {
-  const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
+  const lockKey = REDIS_LOCKOUT_KEYS.ACCOUNT_LOCKOUT(email);
 
   try {
     const isLockedInRedis = await redisIsLocked(lockKey);
@@ -90,13 +91,13 @@ export const lockAccount = async (
   email: string,
   reason: string
 ): Promise<void> => {
-  const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
+  const lockKey = REDIS_LOCKOUT_KEYS.ACCOUNT_LOCKOUT(email);
   const lockedUntil = new Date(
-    Date.now() + AUTH_CONFIG.LOCKOUT_DURATION_SECONDS * 1000
+    Date.now() + IAM_LOCKOUT_CONFIG.LOCKOUT_DURATION_SECONDS * 1000
   );
 
   try {
-    await redisSetLockout(lockKey, AUTH_CONFIG.LOCKOUT_DURATION_SECONDS);
+    await redisSetLockout(lockKey, IAM_LOCKOUT_CONFIG.LOCKOUT_DURATION_SECONDS);
   } catch (error) {
     logger.error(
       error,
@@ -111,7 +112,7 @@ export const lockAccount = async (
       lockedUntil,
       accountLockedReason: reason,
       accountLockedAt: new Date(),
-      failedLoginAttempts: AUTH_CONFIG.MAX_FAILED_ATTEMPTS,
+      failedLoginAttempts: IAM_LOCKOUT_CONFIG.MAX_FAILED_ATTEMPTS,
       lastFailedLoginAt: new Date(),
     },
   });
@@ -132,8 +133,8 @@ export const lockAccount = async (
  * @param email - Target user's email
  */
 export const unlockAccount = async (email: string): Promise<void> => {
-  const attemptKey = REDIS_KEYS.FAILED_ATTEMPTS(email);
-  const lockKey = REDIS_KEYS.ACCOUNT_LOCKOUT(email);
+  const attemptKey = REDIS_LOCKOUT_KEYS.FAILED_ATTEMPTS(email);
+  const lockKey = REDIS_LOCKOUT_KEYS.ACCOUNT_LOCKOUT(email);
 
   await Promise.all([
     redisResetCounter(attemptKey),
@@ -170,11 +171,11 @@ export const recordFailedAttempt = async (
   shouldLock: boolean;
   attemptRemaining: number;
 }> => {
-  const attemptKey = REDIS_KEYS.FAILED_ATTEMPTS(email);
+  const attemptKey = REDIS_LOCKOUT_KEYS.FAILED_ATTEMPTS(email);
 
   const attemptCount = await redisIncrementWithTTL(
     attemptKey,
-    AUTH_CONFIG.ATTEMPT_WINDOW_SECONDS
+    IAM_LOCKOUT_CONFIG.ATTEMPT_WINDOW_SECONDS
   );
 
   logger.warn({
@@ -182,10 +183,10 @@ export const recordFailedAttempt = async (
     email,
     ipAddress,
     attemptCount,
-    threshold: AUTH_CONFIG.MAX_FAILED_ATTEMPTS,
+    threshold: IAM_LOCKOUT_CONFIG.MAX_FAILED_ATTEMPTS,
   });
 
-  if (attemptCount >= AUTH_CONFIG.MAX_FAILED_ATTEMPTS) {
+  if (attemptCount >= IAM_LOCKOUT_CONFIG.MAX_FAILED_ATTEMPTS) {
     await lockAccount(email, 'Too many failed login attempts!');
     return {
       shouldLock: true,
@@ -195,7 +196,7 @@ export const recordFailedAttempt = async (
 
   return {
     shouldLock: false,
-    attemptRemaining: AUTH_CONFIG.MAX_FAILED_ATTEMPTS - attemptCount,
+    attemptRemaining: IAM_LOCKOUT_CONFIG.MAX_FAILED_ATTEMPTS - attemptCount,
   };
 };
 

@@ -1,0 +1,30 @@
+import { SERVICE_NAMES } from '@aegis/common';
+
+/**
+ * Route path constants for API Gateway probes and public versions.
+ */
+export const GATEWAY_ROUTES = {
+  HEALTH: '/gateway-health',
+  READY: '/ready',
+  LIVE: '/live',
+  V1_PREFIX: '/v1',
+  AUTH: '/auth',
+  ADMIN: '/admin',
+  UPSTREAM_IAM_AUTH_PREFIX: '/internal/v1/auth',
+  UPSTREAM_IAM_ADMIN_PREFIX: '/internal/v1/admin',
+} as const;
+
+/**
+ * Proxy and circuit breaker settings for downstream microservices.
+ */
+export const GATEWAY_PROXY_CONFIG = {
+  IAM_SERVICE: {
+    name: SERVICE_NAMES.IAM,
+    timeoutMs: 5000,
+    circuitBreaker: {
+      enabled: true,
+      resetTimeout: 20000,
+      errorThreshold: 75,
+    },
+  },
+} as const;

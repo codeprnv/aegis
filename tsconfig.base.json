@@ -27,7 +27,8 @@
       "@aegis/auth": ["packages/auth/index.ts"],
       "@aegis/middlewares": ["packages/middlewares/index.ts"],
       "@aegis/events": ["packages/events/index.ts"],
-      "@aegis/email-templates": ["packages/email-templates/index.ts"]
+      "@aegis/email-templates": ["packages/email-templates/index.ts"],
+      "@aegis/gateway": ["packages/gateway/index.ts"]
     }
   }
 }

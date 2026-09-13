@@ -1,4 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+} from '@aegis/auth';
 import { logger } from '@aegis/common';
 import { prisma, redis } from '@aegis/database';
 import {
@@ -8,6 +13,7 @@ import {
   type AuthSessionRevokePayload,
 } from '@aegis/events';
 import { Job, Worker } from 'bullmq';
+import { SESSION_REVOCATION_REASONS } from '../config/index.js';
 
 /**
  * Initializes and starts the bullMQ consumer for security events requiring IAM intervention
@@ -52,15 +58,15 @@ export const startSecurityWorker = (): Worker => {
             },
             data: {
               revokedAt: new Date(),
-              revokedReason: reason || 'Audit Service anomaly revocation',
+              revokedReason: reason || SESSION_REVOCATION_REASONS.AUDIT_ANOMALY,
             },
           });
 
-          // Edge blocklist write with 960-second TTL(15m access token + 60s buffer)
+          // Edge blocklist write with 960-second TTL (15m access token + 60s buffer)
           await redis.setex(
-            `aegis:revoked:session:${sessionId}`,
-            960,
-            'revoked'
+            REDIS_AUTH_KEYS.REVOKED_SESSION(sessionId),
+            EDGE_REVOCATION_TTL_SECONDS,
+            REDIS_REVOKED_SENTINEL
           );
 
           logger.info(

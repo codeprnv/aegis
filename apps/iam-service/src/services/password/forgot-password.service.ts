@@ -1,5 +1,4 @@
 import {
-  AUTH_CONFIG,
   hashPassword,
   hashTokenSHA256,
   logger,
@@ -9,6 +8,11 @@ import { prisma } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError, UnauthorizedError } from '@aegis/middlewares';
 import { randomBytes, randomInt } from 'crypto';
+import {
+  IAM_PASSWORD_CONFIG,
+  IAM_TRANSACTION_OPTIONS,
+  SESSION_REVOCATION_REASONS,
+} from '../../config/index.js';
 import { canUsePassword } from './password-history.service';
 
 /**
@@ -42,15 +46,15 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   }
 
   const otp = generateOTP();
-  const token = randomBytes(32).toString('hex');
+  const token = randomBytes(IAM_PASSWORD_CONFIG.RESET_TOKEN.BYTE_LENGTH).toString('hex');
   const otpHash = hashTokenSHA256(otp);
   const tokenHash = hashTokenSHA256(token);
 
   const otpExpiry = new Date(
-    Date.now() + AUTH_CONFIG.OTP_EXPIRY_MINUTES * 60 * 1000
+    Date.now() + IAM_PASSWORD_CONFIG.OTP.EXPIRY_MINUTES * 60 * 1000
   );
   const tokenExpiry = new Date(
-    Date.now() + AUTH_CONFIG.TOKEN_EXPIRY_MINUTES * 60 * 1000
+    Date.now() + IAM_PASSWORD_CONFIG.RESET_TOKEN.EXPIRY_MINUTES * 60 * 1000
   );
 
   await prisma.passwordReset.deleteMany({
@@ -133,7 +137,7 @@ export const resetPasswordWithOTP = async (
     );
   }
 
-  if (passwordResetRequest.otpAttempts >= AUTH_CONFIG.MAX_OTP_ATTEMPTS) {
+  if (passwordResetRequest.otpAttempts >= IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS) {
     throw new BadRequestError('Too many OTP attempts! Please try again later.');
   }
 
@@ -148,7 +152,7 @@ export const resetPasswordWithOTP = async (
     });
 
     const attemptsRemaining =
-      AUTH_CONFIG.MAX_OTP_ATTEMPTS - (passwordResetRequest.otpAttempts + 1);
+      IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS - (passwordResetRequest.otpAttempts + 1);
 
     if (attemptsRemaining <= 0) {
       throw new BadRequestError(
@@ -197,7 +201,7 @@ export const resetPasswordWithOTP = async (
     const oldHistory = await tx.passwordHistory.findMany({
       where: { userId: user.id },
       orderBy: { changedAt: 'desc' },
-      skip: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+      skip: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
       select: { id: true },
     });
 
@@ -213,10 +217,10 @@ export const resetPasswordWithOTP = async (
       where: { userId: user.id, revokedAt: null },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Password reset',
+        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
       },
     });
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
     userId: user.id,
@@ -312,7 +316,7 @@ export const resetPasswordWithToken = async (
     const oldHistory = await tx.passwordHistory.findMany({
       where: { userId: passwordResetRequest.userId },
       orderBy: { changedAt: 'desc' },
-      skip: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+      skip: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
       select: { id: true },
     });
 
@@ -328,10 +332,10 @@ export const resetPasswordWithToken = async (
       where: { userId: passwordResetRequest.userId, revokedAt: null },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Password reset',
+        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
       },
     });
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
     userId: passwordResetRequest.userId,

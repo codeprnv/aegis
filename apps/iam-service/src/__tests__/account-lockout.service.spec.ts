@@ -1,4 +1,3 @@
-import { AUTH_CONFIG } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import {
   isAccountLocked,
@@ -30,17 +29,20 @@ jest.mock('@aegis/database', () => ({
 }));
 
 jest.mock('@aegis/common', () => ({
-  AUTH_CONFIG: {
-    LOCKOUT_DURATION_SECONDS: 300,
-    MAX_FAILED_ATTEMPTS: 3,
-    ATTEMPT_WINDOW_SECONDS: 60,
-  },
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
   },
-  REDIS_KEYS: {
+}));
+
+jest.mock('../config/index.js', () => ({
+  IAM_LOCKOUT_CONFIG: {
+    LOCKOUT_DURATION_SECONDS: 300,
+    MAX_FAILED_ATTEMPTS: 3,
+    ATTEMPT_WINDOW_SECONDS: 60,
+  },
+  REDIS_LOCKOUT_KEYS: {
     ACCOUNT_LOCKOUT: (email: string) => `lockout:${email}`,
     FAILED_ATTEMPTS: (email: string) => `attempts:${email}`,
   },

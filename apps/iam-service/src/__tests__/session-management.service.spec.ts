@@ -1,3 +1,4 @@
+import { REDIS_AUTH_KEYS } from '@aegis/auth';
 import { prisma, redis } from '@aegis/database';
 import { NotFoundError, UnauthorizedError } from '@aegis/middlewares';
 import {
@@ -141,7 +142,7 @@ describe('Session Management Service', () => {
         },
       });
       expect(redis.setex).toHaveBeenCalledWith(
-        `aegis:revoked:session:${otherSessionId}`,
+        REDIS_AUTH_KEYS.REVOKED_SESSION(otherSessionId),
         960,
         'revoked'
       );
@@ -173,7 +174,9 @@ describe('Session Management Service', () => {
   describe('revokeAllOtherSessions', () => {
     it('should revoke all other sessions and batch set Redis blocklist via pipeline', async () => {
       const mockOtherSessions = [{ id: 'session-2' }, { id: 'session-3' }];
-      (prisma.session.findMany as jest.Mock).mockResolvedValue(mockOtherSessions);
+      (prisma.session.findMany as jest.Mock).mockResolvedValue(
+        mockOtherSessions
+      );
       (prisma.session.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
 
       const count = await revokeAllOtherSessions(userId, currentSessionId);
@@ -191,12 +194,12 @@ describe('Session Management Service', () => {
       });
       expect(redis.pipeline).toHaveBeenCalled();
       expect(mockPipeline.setex).toHaveBeenCalledWith(
-        'aegis:revoked:session:session-2',
+        REDIS_AUTH_KEYS.REVOKED_SESSION('session-2'),
         960,
         'revoked'
       );
       expect(mockPipeline.setex).toHaveBeenCalledWith(
-        'aegis:revoked:session:session-3',
+        REDIS_AUTH_KEYS.REVOKED_SESSION('session-3'),
         960,
         'revoked'
       );

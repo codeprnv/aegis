@@ -1,12 +1,14 @@
 process.env.SERVICE_NAME = 'notification-service';
 
-import { logger } from '@aegis/common';
+import { logger, SERVICE_NAMES } from '@aegis/common';
 import express from 'express';
+import { NOTIFICATION_SERVER_CONFIG } from './config/index.js';
 import { checkHealth } from './health';
 import { startEmailWorker } from './workers/email.worker';
 
 const app = express();
-const port = process.env.NOTIFICATION_SERVICE_PORT || 6001;
+const port =
+  process.env.NOTIFICATION_SERVICE_PORT || NOTIFICATION_SERVER_CONFIG.PORT;
 
 app.use(express.json());
 
@@ -41,7 +43,7 @@ const shutdown = async () => {
       'Could not close connections in time, forcefully shutting down'
     );
     process.exit(1);
-  }, 10000);
+  }, NOTIFICATION_SERVER_CONFIG.SHUTDOWN_TIMEOUT_MS);
 };
 
 process.on('SIGTERM', shutdown);

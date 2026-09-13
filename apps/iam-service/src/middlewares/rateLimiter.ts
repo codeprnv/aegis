@@ -1,4 +1,4 @@
-import { AUTH_CONFIG } from '@aegis/common';
+import { IAM_RATE_LIMIT_CONFIG } from '../config/index.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 import RedisClient from 'ioredis';
@@ -11,10 +11,10 @@ const redisClient = new RedisClient(process.env.REDIS_URL || 'redis://localhost:
 export const refreshRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
-    prefix: 'aegis:iam:rl:refresh:',
+    prefix: IAM_RATE_LIMIT_CONFIG.REFRESH.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.REFRESH_WINDOW_MS, // 15 minutes
-  limit: AUTH_CONFIG.RATE_LIMIT.MAX_REFRESH_REQUESTS, // 5 requests
+  windowMs: IAM_RATE_LIMIT_CONFIG.REFRESH.WINDOW_MS,
+  limit: IAM_RATE_LIMIT_CONFIG.REFRESH.MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -29,10 +29,10 @@ export const refreshRateLimiter = rateLimit({
 export const loginRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
-    prefix: 'aegis:iam:rl:login:',
+    prefix: IAM_RATE_LIMIT_CONFIG.LOGIN.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.LOGIN_WINDOW_MS, // 15 minutes
-  limit: AUTH_CONFIG.RATE_LIMIT.MAX_LOGIN_REQUESTS, // 10 requests
+  windowMs: IAM_RATE_LIMIT_CONFIG.LOGIN.WINDOW_MS,
+  limit: IAM_RATE_LIMIT_CONFIG.LOGIN.MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -47,10 +47,10 @@ export const loginRateLimiter = rateLimit({
 export const registerRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
-    prefix: 'aegis:iam:rl:register:',
+    prefix: IAM_RATE_LIMIT_CONFIG.REGISTER.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.REGISTER_WINDOW_MS, // 1 hour
-  limit: AUTH_CONFIG.RATE_LIMIT.MAX_REGISTER_REQUESTS, // 5 requests
+  windowMs: IAM_RATE_LIMIT_CONFIG.REGISTER.WINDOW_MS,
+  limit: IAM_RATE_LIMIT_CONFIG.REGISTER.MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -65,10 +65,10 @@ export const registerRateLimiter = rateLimit({
 export const forgotPasswordRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
-    prefix: 'aegis:iam:rl:forgot-password:',
+    prefix: IAM_RATE_LIMIT_CONFIG.FORGOT_PASSWORD.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.FORGOT_PASSWORD_WINDOW_MS, // 1 hour
-  limit: AUTH_CONFIG.RATE_LIMIT.MAX_FORGOT_PASSWORD_REQUESTS, // 3 requests
+  windowMs: IAM_RATE_LIMIT_CONFIG.FORGOT_PASSWORD.WINDOW_MS,
+  limit: IAM_RATE_LIMIT_CONFIG.FORGOT_PASSWORD.MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -91,10 +91,10 @@ export const forgotPasswordRateLimiter = rateLimit({
 export const resetPasswordRateLimiter = rateLimit({
   store: new RedisStore({
     sendCommand: (...args: string[]) => redisClient.call(...args),
-    prefix: 'aegis:iam:rl:reset-password:',
+    prefix: IAM_RATE_LIMIT_CONFIG.RESET_PASSWORD.REDIS_PREFIX,
   }),
-  windowMs: AUTH_CONFIG.RATE_LIMIT.RESET_PASSWORD_WINDOW_MS, // 15 minutes
-  limit: AUTH_CONFIG.RATE_LIMIT.MAX_RESET_PASSWORD_REQUESTS, // 5 requests
+  windowMs: IAM_RATE_LIMIT_CONFIG.RESET_PASSWORD.WINDOW_MS,
+  limit: IAM_RATE_LIMIT_CONFIG.RESET_PASSWORD.MAX_REQUESTS,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

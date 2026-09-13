@@ -1,8 +1,14 @@
+import { AUTH_ROLES } from '@aegis/auth';
 import { hashPassword, logger } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError, ForbiddenError } from '@aegis/middlewares';
 import crypto from 'crypto';
+import {
+  IAM_PASSWORD_CONFIG,
+  IAM_TRANSACTION_OPTIONS,
+  SESSION_REVOCATION_REASONS,
+} from '../../config/index.js';
 
 /**
  * Generates an administrative temporary password adhering to complexity requirements.
@@ -11,12 +17,13 @@ import crypto from 'crypto';
  * @returns Temporary password string
  */
 const generateTemporaryPassword = (): string => {
-  const chars = 'ABCDEFGHJKLMNOPQRSTUVWXYZ23456789';
-  const randomChars = Array.from({ length: 6 }, () =>
-    chars.charAt(crypto.randomInt(0, chars.length))
+  const { ALLOWED_CHARS, RANDOM_CHARS_LENGTH, PREFIX } =
+    IAM_PASSWORD_CONFIG.ADMIN_TEMP_PASSWORD;
+  const randomChars = Array.from({ length: RANDOM_CHARS_LENGTH }, () =>
+    ALLOWED_CHARS.charAt(crypto.randomInt(0, ALLOWED_CHARS.length))
   ).join('');
 
-  return `TempPass#${randomChars}`;
+  return `${PREFIX}${randomChars}`;
 };
 
 /**
@@ -42,7 +49,7 @@ export const adminResetPassword = async (
     throw new BadRequestError('Admin user not found!');
   }
 
-  if (admin.role !== 'ADMIN') {
+  if (admin.role !== AUTH_ROLES.ADMIN) {
     throw new ForbiddenError('Insufficient permissions to reset passwords');
   }
 
@@ -61,7 +68,7 @@ export const adminResetPassword = async (
     );
   }
 
-  if (targetUser.role === 'ADMIN') {
+  if (targetUser.role === AUTH_ROLES.ADMIN) {
     throw new ForbiddenError('Admin cannot reset other admin password');
   }
 
@@ -89,10 +96,10 @@ export const adminResetPassword = async (
       where: { userId: targetUserId, revokedAt: null },
       data: {
         revokedAt: new Date(),
-        revokedReason: 'Password reset by admin!',
+        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET_BY_ADMIN,
       },
     });
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   enqueueNotification(NotificationEvent.ADMIN_PASSWORD_RESET, {
     userId: targetUserId,

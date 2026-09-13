@@ -3,6 +3,7 @@
     "ABCDEFGHJKLMNOPQRSTUVWXYZ",
     "linklocal",
     "setex",
+    "transactionally",
     "uniquelocal"
   ],
   "WillLuke.nextjs.hasPrompted": true

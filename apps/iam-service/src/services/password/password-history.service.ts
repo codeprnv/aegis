@@ -1,11 +1,14 @@
 import {
-  AUTH_CONFIG,
   hashPassword,
   logger,
   verifyPassword,
 } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { ConflictError } from '@aegis/middlewares';
+import {
+  IAM_PASSWORD_CONFIG,
+  IAM_TRANSACTION_OPTIONS,
+} from '../../config/index.js';
 
 /**
  * Checks whether a candidate password matches any recent password in the user's history.
@@ -22,7 +25,7 @@ export const isPasswordReused = async (
   const history = await prisma.passwordHistory.findMany({
     where: { userId },
     orderBy: { changedAt: 'desc' },
-    take: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+    take: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
     select: {
       passwordHash: true,
       changedAt: true,
@@ -78,7 +81,7 @@ export const validateAndStorePassword = async (
     const oldHistory = await tx.passwordHistory.findMany({
       where: { userId },
       orderBy: { changedAt: 'desc' },
-      skip: AUTH_CONFIG.PASSWORD_HISTORY_LIMIT,
+      skip: IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT,
       select: { id: true },
     });
 
@@ -89,7 +92,7 @@ export const validateAndStorePassword = async (
         },
       });
     }
-  });
+  }, IAM_TRANSACTION_OPTIONS);
 
   logger.info({ message: 'Password updated successfully!', userId });
 };
@@ -109,7 +112,7 @@ export const canUsePassword = async (
 
   if (isReused) {
     throw new ConflictError(
-      `Cannot reuse any of your last ${AUTH_CONFIG.PASSWORD_HISTORY_LIMIT} password(s)`
+      `Cannot reuse any of your last ${IAM_PASSWORD_CONFIG.PASSWORD_HISTORY_LIMIT} password(s)`
     );
   }
 };

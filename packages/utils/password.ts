@@ -2,7 +2,7 @@ import * as argon2 from 'argon2';
 import PasswordValidator from 'password-validator';
 import { logger } from './logger.js';
 
-const ARGON2_CONFIG = {
+export const ARGON2_CONFIG = {
   type: argon2.argon2id,
   memoryCost: 19456, // 19 MB
   timeCost: 3, // iterations
@@ -11,7 +11,28 @@ const ARGON2_CONFIG = {
   saltLength: 32,
 } as const;
 
-interface PasswordOptions {
+/**
+ * Pre-computed static dummy Argon2id hash generated with exact ARGON2_CONFIG parameters:
+ * m=19456 (19 MB), t=3 iterations, p=1 lane.
+ * Used for constant-time password verification on non-existent users (SEC-06)
+ * without blocking the event loop on bootstrap.
+ */
+export const DUMMY_ARGON2_HASH =
+  '$argon2id$v=19$m=19456,t=3,p=1$851RB88Lpw7nqpPcBRRRmQ$VyArlnQcmCTBsvEFS/bLrb6EQoPJkDZNEt7CwMYCncg';
+
+/**
+ * Standard password complexity constraints used across Aegis.
+ */
+export const DEFAULT_PASSWORD_POLICY = {
+  MIN_LENGTH: 8,
+  MAX_LENGTH: 128,
+  LOWERCASE_CHARS: 3,
+  UPPERCASE_CHARS: 1,
+  DIGITS: 1,
+  SYMBOLS: 1,
+} as const;
+
+export interface PasswordOptions {
   MIN_LENGTH?: number;
   MAX_LENGTH?: number;
   LOWERCASE_CHARS?: number;

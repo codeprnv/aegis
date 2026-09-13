@@ -1,5 +1,9 @@
 import { NextFunction, Request, Response } from 'express';
-import { verifyAccessToken } from '../../auth/token-service.js';
+import {
+  AUTH_COOKIE_NAMES,
+  REDIS_AUTH_KEYS,
+  verifyAccessToken,
+} from '@aegis/auth';
 import { redis } from '../../database/redis.js';
 import { logger } from '../../utils/logger.js';
 
@@ -18,7 +22,8 @@ export const extractAuthContext = async (
   next: NextFunction
 ): Promise<void> => {
   const token =
-    req.cookies?.['access_token'] || req.headers.authorization?.split(' ')[1];
+    req.cookies?.[AUTH_COOKIE_NAMES.ACCESS_TOKEN] ||
+    req.headers.authorization?.split(' ')[1];
 
   if (!token) {
     return next();
@@ -31,7 +36,7 @@ export const extractAuthContext = async (
     if (decodedToken.sessionId) {
       try {
         const isRevoked = await redis.get(
-          `aegis:revoked:session:${decodedToken.sessionId}`
+          REDIS_AUTH_KEYS.REVOKED_SESSION(decodedToken.sessionId)
         );
         if (isRevoked) {
           res.status(401).json({
@@ -45,10 +50,10 @@ export const extractAuthContext = async (
         // Fail-safe resilience: log a high-priority operational alert without crashing the edge
         logger.error(
           {
-            alert: "EDGE_REVOCATION_BYPASS_ACTIVE",
-            securityRisk: "HIGH",
+            alert: 'EDGE_REVOCATION_BYPASS_ACTIVE',
+            securityRisk: 'HIGH',
             sessionId: decodedToken.sessionId,
-            error: redisError
+            error: redisError,
           },
           'CRITICAL: Edge session revocation cache unreachable - fallback to raw JWT verification active'
         );

@@ -11,14 +11,15 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@aegis/common': resolve(__dirname, '../../packages'),
-      '@aegis/types': resolve(__dirname, '../../packages/types'),
+      '@aegis/common': resolve(__dirname, '../../packages/index.ts'),
+      '@aegis/types': resolve(__dirname, '../../packages/types/index.ts'),
       '@aegis/database': resolve(
         __dirname,
         '../../packages/database/client.ts'
       ),
-      '@aegis/auth': resolve(__dirname, '../../packages/auth'),
-      '@aegis/middlewares': resolve(__dirname, '../../packages/middlewares'),
+      '@aegis/auth': resolve(__dirname, '../../packages/auth/index.ts'),
+      '@aegis/middlewares': resolve(__dirname, '../../packages/middlewares/index.ts'),
+      '@aegis/gateway': resolve(__dirname, '../../packages/gateway/index.ts'),
     },
     extensions: ['.ts', '.js'],
   },

@@ -1,5 +1,10 @@
-import { clearCookie, setCookie } from '@aegis/auth';
-import { AUTH_CONFIG } from '@aegis/common';
+import {
+  AUTH_COOKIE_MAX_AGE_MS,
+  AUTH_COOKIE_NAMES,
+  clearCookie,
+  setCookie,
+} from '@aegis/auth';
+import { HTTP_HEADERS } from '@aegis/common';
 import { BadRequestError } from '@aegis/middlewares';
 import type { NextFunction, Request, Response } from 'express';
 import * as authService from '../services';
@@ -63,13 +68,13 @@ export const loginUserController = async (
       headers: req.headers,
     });
 
-    setCookie('access_token', data.accessToken || '', res);
+    setCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, data.accessToken || '', res);
 
     const refreshTokenMaxAge = validatedData.rememberMe
-      ? 15 * 24 * 60 * 60 * 1000 // 15 days
-      : 24 * 60 * 60 * 1000; // 1 day
+      ? AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_REMEMBER_ME
+      : AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_DEFAULT;
 
-    setCookie('refresh_token', data.refreshToken || '', res, {
+    setCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, data.refreshToken || '', res, {
       maxAge: refreshTokenMaxAge,
     });
 
@@ -101,7 +106,7 @@ export const refreshTokenController = async (
   next: NextFunction
 ) => {
   try {
-    const refreshToken = req.cookies['refresh_token'];
+    const refreshToken = req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN];
 
     if (!refreshToken) {
       throw new BadRequestError('Refresh token required');
@@ -109,9 +114,9 @@ export const refreshTokenController = async (
 
     const data = await authService.refreshTokenService(refreshToken, req.ip);
 
-    setCookie('access_token', data.accessToken || '', res);
-    setCookie('refresh_token', data.refreshToken || '', res, {
-      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    setCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, data.accessToken || '', res);
+    setCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, data.refreshToken || '', res, {
+      maxAge: AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_DEFAULT,
     });
 
     res.status(200).json({
@@ -135,13 +140,15 @@ export const logoutController = async (
 ) => {
   try {
     const userId = req.user?.sub;
-    let sessionId = req.headers['x-session-id'] as string;
+    let sessionId = req.headers[HTTP_HEADERS.SESSION_ID] as string;
     const logoutAll = req.body.logoutAll === true;
 
-    if (!sessionId && req.cookies['refresh_token']) {
+    if (!sessionId && req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN]) {
       try {
         const { verifyRefreshToken } = await import('@aegis/auth');
-        const decoded = verifyRefreshToken(req.cookies['refresh_token']);
+        const decoded = verifyRefreshToken(
+          req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN]
+        );
         if (decoded.sessionId) {
           sessionId = decoded.sessionId;
         }
@@ -156,8 +163,8 @@ export const logoutController = async (
 
     await authService.logoutService(userId, sessionId, logoutAll);
 
-    clearCookie('access_token', res);
-    clearCookie('refresh_token', res);
+    clearCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, res);
+    clearCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, res);
 
     res.status(200).json({
       success: true,
@@ -222,9 +229,9 @@ export const verifyEmailController = async (
 
     const data = await authService.verifyEmailService(token);
 
-    setCookie('access_token', data.accessToken || '', res);
-    setCookie('refresh_token', data.refreshToken || '', res, {
-      maxAge: AUTH_CONFIG.REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    setCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, data.accessToken || '', res);
+    setCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, data.refreshToken || '', res, {
+      maxAge: AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_DEFAULT,
     });
 
     res.status(200).json({
