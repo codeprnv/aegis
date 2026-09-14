@@ -3,6 +3,7 @@ import { BadRequestError } from '../middlewares/error/index.js';
 import {
   JWT_AUDIENCES,
   JWT_ISSUERS,
+  JWT_SIGNING_ALGORITHMS,
   TOKEN_EXPIRATIONS,
   TOKEN_TYPES,
 } from './tokens.js';
@@ -46,6 +47,7 @@ export const verifyAccessToken = (
   const decoded = jwt.verify(token, ACCESS_TOKEN_SECRET, {
     issuer: JWT_ISSUERS.IAM,
     audience: expectedAudience,
+    algorithms: [JWT_SIGNING_ALGORITHMS.SYMMETRIC],
   }) as TokenPayload;
 
   if (decoded.type !== TOKEN_TYPES.ACCESS) {
@@ -80,6 +82,7 @@ export const verifyRefreshToken = (
   const decoded = jwt.verify(token, REFRESH_TOKEN_SECRET, {
     issuer: JWT_ISSUERS.IAM,
     audience: expectedAudience,
+    algorithms: [JWT_SIGNING_ALGORITHMS.SYMMETRIC],
   }) as TokenPayload;
 
   if (decoded.type !== TOKEN_TYPES.REFRESH) {

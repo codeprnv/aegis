@@ -1,6 +1,12 @@
-import { AUTH_ROLES } from '@aegis/auth';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  AUTH_ROLES,
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+} from '@aegis/auth';
 import { hashPassword, logger } from '@aegis/common';
-import { prisma } from '@aegis/database';
+import { prisma, redis } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError, ForbiddenError } from '@aegis/middlewares';
 import crypto from 'crypto';
@@ -92,6 +98,32 @@ export const adminResetPassword = async (
       },
     });
 
+    // Edge Redis revocation pipeline
+    const activeSessions = await tx.session.findMany({
+      where: { userId: targetUserId, revokedAt: null },
+      select: { id: true },
+    });
+
+    if (activeSessions.length > 0) {
+      const sessionIds = activeSessions.map((s) => s.id);
+      const pipeline = redis.pipeline();
+      for (const id of sessionIds) {
+        const key = REDIS_AUTH_KEYS.REVOKED_SESSION(id);
+        if (typeof (pipeline as any).setex === 'function') {
+          (pipeline as any).setex(
+            key,
+            EDGE_REVOCATION_TTL_SECONDS,
+            REDIS_REVOKED_SENTINEL
+          );
+        } else {
+          pipeline.set(key, REDIS_REVOKED_SENTINEL, {
+            ex: EDGE_REVOCATION_TTL_SECONDS,
+          });
+        }
+      }
+      await pipeline.exec()
+    }
+
     await tx.session.updateMany({
       where: { userId: targetUserId, revokedAt: null },
       data: {
@@ -107,7 +139,10 @@ export const adminResetPassword = async (
     username: targetUser.username,
     temporaryPassword,
   }).catch((err: Error) =>
-    logger.error({ error: err.message, targetUserId }, 'Failed to enqueue admin password reset email')
+    logger.error(
+      { error: err.message, targetUserId },
+      'Failed to enqueue admin password reset email'
+    )
   );
 
   logger.warn({

@@ -21,6 +21,7 @@ import {
   publishLoginSecurityEvent,
   publishUserRegistered,
 } from '../events/auth-events.publisher';
+import { publishAccountAlreadyExistsNotification } from '../events/auth-events.publisher.js';
 import { issueSessionTokenPair } from './token-issuance.service';
 
 /**
@@ -45,6 +46,9 @@ export const registerUser = async (
     throw new BadRequestError(passwordValidation.error || 'Invalid password');
   }
 
+  // CRYPTO-03: Hash password unconditionally to maintain uniform execution time
+  const passwordHash = await hashPassword(password);
+
   const existingUser = await prisma.user.findFirst({
     where: {
       OR: [{ email }, { username }],
@@ -53,9 +57,25 @@ export const registerUser = async (
   });
 
   if (existingUser) {
-    throw new ConflictError(
-      'A user with this email or username already exists'
-    );
+    // Only dispatch the security alert if the attempt matched the registered user's email
+    if (existingUser.email.toLowerCase() === email.toLowerCase()) {
+      const alertThrottleKey = `aegis:iam:alert:already_registered:${existingUser.email}`;
+      const acquired = await redis.set(alertThrottleKey, '1', {
+        ex: 15 * 60,
+        nx: true,
+      });
+      if (acquired === 'OK') {
+        publishAccountAlreadyExistsNotification({
+          email: existingUser.email,
+          loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
+          resetUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/forgot-password`,
+        });
+      }
+    }
+    return {
+      message:
+        'Registration accepted. Please check your email to verify your account.',
+    };
   }
 
   const pendingByEmail = await redis.get(
@@ -66,12 +86,9 @@ export const registerUser = async (
   );
 
   if (pendingByEmail || pendingByUsername) {
-    throw new ConflictError(
-      'A user with this email or username is already pending verification. Please check your email.'
-    );
+    return { message: 'Registration accepted. Please check your email to verify your account.' };
   }
 
-  const passwordHash = await hashPassword(password);
   const rawVerificationToken = randomBytes(
     IAM_REGISTRATION_CONFIG.TOKEN_BYTE_LENGTH
   ).toString('hex');

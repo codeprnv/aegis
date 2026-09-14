@@ -3,7 +3,10 @@ import { z } from 'zod';
 // Login Schema
 export const loginSchema = z.object({
   email: z.string().email('Invalid email format!').toLowerCase().trim(),
-  password: z.string().min(8, 'Password must be at least 8 characters long!'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long!')
+    .max(128, 'Password must not exceed 128 characters'),
   rememberMe: z.boolean().optional(),
   deviceFingerprint: z.string().optional(),
 });
@@ -21,7 +24,10 @@ export const registerSchema = z.object({
     .min(4, 'Username must be at least 4 characters long!')
     .trim(),
   email: z.string().email('Invalid email format!').toLowerCase().trim(),
-  password: z.string().min(8, 'Password must be at least 8 characters long!'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long!')
+    .max(128, 'Password must not exceed 128 characters'),
   mobile: z
     .string()
     .min(10, 'Mobile number must be at least 10 digits long!')

@@ -27,6 +27,9 @@ function createPrismaClient(): PrismaClient {
   }
 
   const pool = new Pool({ connectionString, ...POOL_CONFIG });
+  pool.on('error', (err) => {
+    console.error('Aegis IAM database pool idle client error: ', err.message);
+  });
   globalForPrisma.pgPool = pool;
   const adapter = new PrismaPg(pool);
 
@@ -56,8 +59,14 @@ function createNotificationPrismaClient(): NotificationPrismaClient {
     process.env.NOTIFICATION_DATABASE_URL || url.toString();
 
   const pool = new Pool({ connectionString, ...POOL_CONFIG });
+  pool.on('error', (err) => {
+    console.error(
+      'Aegis Notification database pool idle client error: ',
+      err.message
+    );
+  });
   globalForPrisma.notificationPgPool = pool;
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg(pool, { schema: 'notifications' });
 
   return new NotificationPrismaClient({
     adapter,

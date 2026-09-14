@@ -20,7 +20,7 @@ export const GATEWAY_ROUTES = {
 export const GATEWAY_PROXY_CONFIG = {
   IAM_SERVICE: {
     name: SERVICE_NAMES.IAM,
-    timeoutMs: 5000,
+    timeoutMs: 8000,
     circuitBreaker: {
       enabled: true,
       resetTimeout: 20000,

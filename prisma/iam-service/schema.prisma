@@ -155,11 +155,12 @@ model Session {
   longitude Float?
 
   // Session Lifecycle
-  createdAt     DateTime  @default(now()) @map("created_at")
-  expiresAt     DateTime  @map("expires_at")
-  revokedAt     DateTime? @map("revoked_at")
-  revokedReason String?   @map("revoked_reason")
-  lastUsedAt    DateTime  @map("last_used_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  familyCreatedAt DateTime  @default(now()) @map("family_created_at")
+  expiresAt       DateTime  @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+  revokedReason   String?   @map("revoked_reason")
+  lastUsedAt      DateTime  @map("last_used_at")
 
   @@index([userId])
   @@index([expiresAt])

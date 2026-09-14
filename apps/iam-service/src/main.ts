@@ -12,13 +12,13 @@ dotenv.config({
 const env = iamServiceEnvSchema.parse(process.env);
 Object.freeze(env);
 
-import { disconnectPrisma, prisma } from '@aegis/database';
+import { disconnectPrisma, prisma, redis } from '@aegis/database';
 import {
   accessLogger,
+  createSanitizeHeaders,
   errorMiddleware,
   requestTracer,
   requireInternalToken,
-  sanitizeHeaders,
 } from '@aegis/middlewares';
 import cookieParser from 'cookie-parser';
 import express from 'express';
@@ -26,6 +26,7 @@ import 'express-async-errors';
 import { startSessionCleanupJob } from './jobs/sessionCleanup';
 import adminRoutes from './routes/admin.route';
 import authRoutes from './routes/auth.route';
+import { startSecurityWorker } from './workers/security.worker';
 
 const port = env.IAM_SERVICE_PORT;
 const host = env.HOST;
@@ -36,7 +37,7 @@ app.set('trust proxy', 1);
 
 app.use(cookieParser()); // Parse cookies for refresh token reads
 app.use(requestTracer); // Add correlation ID
-app.use(sanitizeHeaders); // Clean headers
+app.use(createSanitizeHeaders(['x-session-id'])); // Clean headers
 app.use(accessLogger); // Log requests
 
 app.use(express.json({ limit: '2mb' }));
@@ -91,19 +92,33 @@ const server = app.listen(port as number, '0.0.0.0', () => {
 });
 server.on('error', (err) => logger.error(err));
 startSessionCleanupJob();
+const securityWorker = startSecurityWorker();
 
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await disconnectPrisma();
-  server.close(() => {
+  server.close(async () => {
+    try {
+      await securityWorker.close();
+      await redis.quit();
+      await disconnectPrisma();
+    } catch (err) {
+      logger.error(err, 'Error during graceful shutdown');
+    }
     logger.info('Server closed');
     process.exit(0);
   });
 });
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await disconnectPrisma();
-  server.close(() => {
+  server.close(async () => {
+    try {
+      await securityWorker.close();
+      await redis.quit();
+      await disconnectPrisma();
+    } catch (err) {
+      logger.error(err, 'Error during graceful shutdown');
+    }
+    logger.info('Server closed');
     process.exit(0);
   });
 });

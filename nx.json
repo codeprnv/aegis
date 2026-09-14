@@ -74,6 +74,13 @@
     }
   ],
   "targetDefaults": {
+    "build": {
+      "options": {
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "test": {
       "dependsOn": ["^build"]
     }

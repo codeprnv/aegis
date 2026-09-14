@@ -1,5 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import {
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+} from '@aegis/auth';
 import { logger, validatePassword, verifyPassword } from '@aegis/common';
-import { prisma } from '@aegis/database';
+import { prisma, redis } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError } from '@aegis/middlewares';
 import { SESSION_REVOCATION_REASONS } from '../../config/index.js';
@@ -67,32 +73,64 @@ export const changePassword = async (
   await canUsePassword(userId, newPassword);
   await validateAndStorePassword(userId, newPassword);
 
-  const result = await prisma.session.updateMany({
+  const activeSessions = await prisma.session.findMany({
     where: {
       userId,
       revokedAt: null,
       id: currentSessionId ? { not: currentSessionId } : undefined,
     },
-    data: {
-      revokedAt: new Date(),
-      revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_CHANGE_BY_USER,
-    },
+    select: { id: true },
   });
+
+  let revokedSessionsCount = 0;
+
+  if (activeSessions.length > 0) {
+    const sessionIds = activeSessions.map((s) => s.id);
+    const pipeline = redis.pipeline();
+    for (const id of sessionIds) {
+      const key = REDIS_AUTH_KEYS.REVOKED_SESSION(id);
+      if (typeof (pipeline as any).setex === 'function') {
+        (pipeline as any).setex(
+          key,
+          EDGE_REVOCATION_TTL_SECONDS,
+          REDIS_REVOKED_SENTINEL
+        );
+      } else {
+        pipeline.set(key, REDIS_REVOKED_SENTINEL, {
+          ex: EDGE_REVOCATION_TTL_SECONDS,
+        });
+      }
+    }
+
+    await pipeline.exec();
+
+    const result = await prisma.session.updateMany({
+      where: { id: { in: sessionIds } },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_CHANGE_BY_USER,
+      },
+    });
+    revokedSessionsCount = result.count;
+  }
 
   enqueueNotification(NotificationEvent.PASSWORD_CHANGED, {
     userId: user.id,
     email: user.email,
     username: user.username,
   }).catch((err: Error) =>
-    logger.error({ error: err.message, userId: user.id }, 'Failed to enqueue password changed email')
+    logger.error(
+      { error: err.message, userId: user.id },
+      'Failed to enqueue password changed email'
+    )
   );
 
   logger.info({
     message: 'Password changed successfully',
     userId: user.id,
     email: user.email,
-    revokedSessions: result.count,
+    revokedSessions: revokedSessionsCount,
   });
 
-  return { revokedSessions: result.count };
+  return { revokedSessions: revokedSessionsCount };
 };

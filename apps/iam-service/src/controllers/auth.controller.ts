@@ -139,29 +139,33 @@ export const logoutController = async (
   next: NextFunction
 ) => {
   try {
-    const userId = req.user?.sub;
+    let userId = req.user?.sub;
+    if (userId === 'anonymous') {
+      userId = undefined;
+    }
     let sessionId = req.headers[HTTP_HEADERS.SESSION_ID] as string;
     const logoutAll = req.body.logoutAll === true;
 
-    if (!sessionId && req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN]) {
+    if (req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN]) {
       try {
         const { verifyRefreshToken } = await import('@aegis/auth');
         const decoded = verifyRefreshToken(
           req.cookies[AUTH_COOKIE_NAMES.REFRESH_TOKEN]
         );
-        if (decoded.sessionId) {
+        if (decoded.sessionId && !sessionId) {
           sessionId = decoded.sessionId;
         }
-      } catch (err) {
-        // Ignore if invalid/expired
+        if (decoded.sub && !userId) {
+          userId = decoded.sub;
+        }
+      } catch {
+        // Refresh token may be expired or invalid; proceed with cookie clearing
       }
     }
 
-    if (!userId) {
-      throw new BadRequestError('User ID is required!');
+    if (userId) {
+      await authService.logoutService(userId, sessionId, logoutAll);
     }
-
-    await authService.logoutService(userId, sessionId, logoutAll);
 
     clearCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, res);
     clearCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, res);
@@ -229,23 +233,31 @@ export const verifyEmailController = async (
 
     const data = await authService.verifyEmailService(token);
 
-    setCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, data.accessToken || '', res);
-    setCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, data.refreshToken || '', res, {
-      maxAge: AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_DEFAULT,
-    });
+    if (data.accessToken) {
+      setCookie(AUTH_COOKIE_NAMES.ACCESS_TOKEN, data.accessToken, res);
+    }
+    if (data.refreshToken) {
+      setCookie(AUTH_COOKIE_NAMES.REFRESH_TOKEN, data.refreshToken, res, {
+        maxAge: AUTH_COOKIE_MAX_AGE_MS.REFRESH_TOKEN_DEFAULT,
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully',
-      data: {
-        id: data.id,
-        username: data.username,
-        email: data.email,
-        mobile: data.mobile,
-        role: data.role,
-        createdAt: data.createdAt,
-        sessionId: data.sessionId,
-      },
+      message: data.message || 'Email verified successfully',
+      ...(data.id
+        ? {
+            data: {
+              id: data.id,
+              username: data.username,
+              email: data.email,
+              mobile: data.mobile,
+              role: data.role,
+              createdAt: data.createdAt,
+              sessionId: data.sessionId,
+            },
+          }
+        : {}),
     });
   } catch (error) {
     next(error);

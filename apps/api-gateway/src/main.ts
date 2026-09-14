@@ -32,6 +32,7 @@ import {
   GATEWAY_RATE_LIMIT_CONFIG,
   GATEWAY_ROUTES,
 } from './config/index.js';
+import { gatewayRequireAuth } from './middlewares/gatewayRequireAuth.js';
 import { authRateLimiter, rateLimiter } from './utils/rate-limit.js';
 
 const {
@@ -116,6 +117,12 @@ const v1Router = express.Router();
 // Auth Rate Limiter - DDoS protection (must be BEFORE proxy)
 // Uses strict Regex to prevent bypasses via trailing slashes or varying capitalization
 v1Router.use(GATEWAY_RATE_LIMIT_CONFIG.AUTH_ROUTE_REGEX, authRateLimiter);
+
+// Perimeter Edge Auth Enforcement (SEC-02)
+v1Router.use('/auth/change-password', gatewayRequireAuth);
+v1Router.use('/auth/me', gatewayRequireAuth);
+v1Router.use('/auth/sessions', gatewayRequireAuth);
+v1Router.use(GATEWAY_ROUTES.ADMIN, gatewayRequireAuth);
 
 v1Router.use(
   GATEWAY_ROUTES.AUTH,

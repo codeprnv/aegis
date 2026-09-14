@@ -5,6 +5,9 @@ export enum NotificationEvent {
   PASSWORD_RESET_COMPLETED = 'password.reset.completed',
   PASSWORD_CHANGED = 'password.changed',
   ADMIN_PASSWORD_RESET = 'admin.password.reset',
+  ACCOUNT_ALREADY_EXISTS = 'account.already_exists',
+  SECURITY_LOGIN_ALERT = 'security.login_alert',
+  URGENT_SECURITY_ALERT = 'security.urgent_alert',
 }
 
 // ----- Payload Interfaces ----
@@ -50,6 +53,41 @@ export interface AdminPasswordResetPayload {
   temporaryPassword: string;
 }
 
+export interface AccountAlreadyExistsPayload {
+  email: string;
+  loginUrl: string;
+  resetUrl: string;
+}
+
+export interface SecurityLoginAlertPayload {
+  userId?: string;
+  email: string;
+  username?: string;
+  deviceName?: string;
+  browserName?: string;
+  osName?: string;
+  ipAddress: string;
+  location?: string;
+  timestamp: number;
+  reviewUrl?: string;
+}
+
+export interface UrgentSecurityAlertPayload {
+  userId?: string;
+  email: string;
+  username?: string;
+  alertType:
+    | 'IMPOSSIBLE_TRAVEL'
+    | 'TOKEN_REUSE_DETECTED'
+    | 'SESSION_TERMINATED';
+  ipAddress: string;
+  currentCity?: string;
+  previousCity?: string;
+  velocityKmH?: number;
+  timestamp: number;
+  lockdownUrl?: string;
+}
+
 /* Union type mapping each event to its payload */
 
 export type NotificationPayloadMap = {
@@ -59,6 +97,9 @@ export type NotificationPayloadMap = {
   [NotificationEvent.PASSWORD_RESET_COMPLETED]: PasswordResetCompletedPayload;
   [NotificationEvent.PASSWORD_CHANGED]: PasswordChangePayload;
   [NotificationEvent.ADMIN_PASSWORD_RESET]: AdminPasswordResetPayload;
+  [NotificationEvent.ACCOUNT_ALREADY_EXISTS]: AccountAlreadyExistsPayload;
+  [NotificationEvent.SECURITY_LOGIN_ALERT]: SecurityLoginAlertPayload;
+  [NotificationEvent.URGENT_SECURITY_ALERT]: UrgentSecurityAlertPayload;
 };
 
 // ---- Security Event Types & Payloads ----

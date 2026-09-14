@@ -35,7 +35,6 @@ export interface TokenPairResult {
 export interface RestrictedTokenParams {
   userId: string;
   email: string;
-  role?: string;
 }
 
 /**
@@ -103,7 +102,7 @@ export const issueRestrictedToken = (params: RestrictedTokenParams): string => {
     {
       sub: params.userId,
       email: params.email,
-      role: params.role || AUTH_ROLES.RESTRICTED,
+      role: AUTH_ROLES.RESTRICTED,
       sessionId: 'restricted-session',
     },
     JWT_ISSUERS.IAM,

@@ -8,6 +8,7 @@ import {
   type AuthLoginSuccessPayload,
   type EmailVerificationRequestedPayload,
   type UserRegisteredPayload,
+  type AccountAlreadyExistsPayload,
 } from '@aegis/events';
 
 /**
@@ -97,4 +98,23 @@ export const publishLoginSecurityEvent = (
       'Failed to enqueue login security telemetry event'
     );
   });
+};
+
+export const publishAccountAlreadyExistsNotification = (
+  payload: AccountAlreadyExistsPayload
+): void => {
+  enqueueNotification(NotificationEvent.ACCOUNT_ALREADY_EXISTS, payload).catch(
+    (err: Error) => {
+      logger.error(
+        {
+          event: 'QUEUE_ENQUEUE_FAILURE',
+          severity: 'HIGH',
+          notification: NotificationEvent.ACCOUNT_ALREADY_EXISTS,
+          email: payload.email,
+          error: err.message,
+        },
+        'Failed to enqueue account already exists notification'
+      );
+    }
+  );
 };

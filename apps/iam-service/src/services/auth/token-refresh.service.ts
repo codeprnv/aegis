@@ -4,7 +4,7 @@ import {
   REDIS_REVOKED_SENTINEL,
   verifyRefreshToken,
 } from '@aegis/auth';
-import { hashTokenSHA256 } from '@aegis/common';
+import { hashTokenSHA256, timingSafeHashEqual } from '@aegis/common';
 import { prisma, redis } from '@aegis/database';
 import { UnauthorizedError } from '@aegis/middlewares';
 import { randomUUID } from 'crypto';
@@ -88,7 +88,8 @@ export const refreshTokenService = async (
   }
 
   // Absolute session family lifetime cap (SEC-08)
-  const sessionAgeMs = Date.now() - session.createdAt.getTime();
+  const familyCreatedAt = (session as any).familyCreatedAt || session.createdAt;
+  const sessionAgeMs = Date.now() - familyCreatedAt.getTime();
   if (sessionAgeMs > IAM_SESSION_CONFIG.ABSOLUTE_SESSION_MAX_AGE_MS) {
     await prisma.session.updateMany({
       where: { tokenFamily: session.tokenFamily },
@@ -105,7 +106,7 @@ export const refreshTokenService = async (
     throw new UnauthorizedError('Session expired. Please log in again.');
   }
 
-  const isValid = oldTokenHash === session.refreshTokenHash;
+  const isValid = timingSafeHashEqual(oldTokenHash, session.refreshTokenHash);
   if (!isValid) {
     throw new UnauthorizedError('Invalid refresh token!');
   }
@@ -123,11 +124,23 @@ export const refreshTokenService = async (
       mobile: true,
       role: true,
       createdAt: true,
+      accountLocked: true,
+      deletedAt: true,
     },
   });
 
-  if (!user) {
-    throw new UnauthorizedError('User not found!');
+  if (!user || user.accountLocked || user.deletedAt) {
+    // Revoke the entire session family
+    await prisma.session.updateMany({
+      where: { tokenFamily: validSession.tokenFamily },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: `ACCOUNT_LOCKED_OR_DELETED`,
+      },
+    });
+    throw new UnauthorizedError(
+      `Account is locked or suspended. Please contact support`
+    );
   }
 
   const newSessionId = randomUUID();
@@ -146,6 +159,13 @@ export const refreshTokenService = async (
   });
 
   await prisma.$transaction(async (tx) => {
+    // Lock user row first to prevent deadlock with login.service.ts
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: { lastActiveAt: new Date() },
+    });
+
     const updateResult = await tx.session.updateMany({
       where: {
         id: validSession.id,
@@ -170,11 +190,6 @@ export const refreshTokenService = async (
       throw new UnauthorizedError('Refresh token reuse detected!');
     }
 
-    await tx.user.update({
-      where: { id: user.id },
-      data: { lastActiveAt: new Date() },
-    });
-
     // Create rotated session record in database
     await createSessionRecord(tx, {
       sessionId: newSessionId,
@@ -191,6 +206,7 @@ export const refreshTokenService = async (
       osVersion: validSession.osVersion || undefined,
       browserName: validSession.browserName || undefined,
       browserVersion: validSession.browserVersion || undefined,
+      familyCreatedAt: (validSession as any).familyCreatedAt || validSession.createdAt,
     });
   }, IAM_TRANSACTION_OPTIONS);
 

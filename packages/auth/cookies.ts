@@ -23,3 +23,8 @@ export const DEFAULT_COOKIE_OPTIONS = {
   sameSite: 'strict' as const,
   path: '/',
 };
+
+export const REFRESH_COOKIE_OPTIONS = {
+  ...DEFAULT_COOKIE_OPTIONS,
+  path: '/api/v1/auth/refresh',
+};

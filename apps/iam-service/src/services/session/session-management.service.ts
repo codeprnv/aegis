@@ -42,6 +42,7 @@ export interface CreateSessionOptions {
   osVersion?: string;
   browserName?: string;
   browserVersion?: string;
+  familyCreatedAt?: Date;
 }
 
 /**
@@ -72,6 +73,7 @@ export const createSessionRecord = async (
       browserVersion: options.browserVersion || undefined,
       tokenFamily: options.tokenFamily,
       rotationCount: options.rotationCount ?? 0,
+      familyCreatedAt: options.familyCreatedAt || new Date(),
     },
   });
 };
@@ -259,10 +261,6 @@ export const logoutService = async (
       where: {
         id: sessionId,
         userId,
-      },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: SESSION_REVOCATION_REASONS.MANUAL_USER_LOGOUT,
       },
     });
 

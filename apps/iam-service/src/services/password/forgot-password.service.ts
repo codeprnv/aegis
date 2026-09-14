@@ -1,10 +1,16 @@
 import {
+  EDGE_REVOCATION_TTL_SECONDS,
+  REDIS_AUTH_KEYS,
+  REDIS_REVOKED_SENTINEL,
+} from '@aegis/auth';
+import {
   hashPassword,
   hashTokenSHA256,
   logger,
+  timingSafeHashEqual,
   validatePassword,
 } from '@aegis/common';
-import { prisma } from '@aegis/database';
+import { prisma, redis } from '@aegis/database';
 import { enqueueNotification, NotificationEvent } from '@aegis/events';
 import { BadRequestError, UnauthorizedError } from '@aegis/middlewares';
 import { randomBytes, randomInt } from 'crypto';
@@ -13,6 +19,7 @@ import {
   IAM_TRANSACTION_OPTIONS,
   SESSION_REVOCATION_REASONS,
 } from '../../config/index.js';
+import { unlockAccount } from '../auth/account-lockout.service';
 import { canUsePassword } from './password-history.service';
 
 /**
@@ -46,7 +53,9 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
   }
 
   const otp = generateOTP();
-  const token = randomBytes(IAM_PASSWORD_CONFIG.RESET_TOKEN.BYTE_LENGTH).toString('hex');
+  const token = randomBytes(
+    IAM_PASSWORD_CONFIG.RESET_TOKEN.BYTE_LENGTH
+  ).toString('hex');
   const otpHash = hashTokenSHA256(otp);
   const tokenHash = hashTokenSHA256(token);
 
@@ -82,7 +91,10 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
     otpExpiresAt: otpExpiry,
     resetToken: token,
   }).catch((err: Error) =>
-    logger.error({ error: err.message, userId: user.id }, 'Failed to enqueue password reset email')
+    logger.error(
+      { error: err.message, userId: user.id },
+      'Failed to enqueue password reset email'
+    )
   );
 
   logger.info({
@@ -137,22 +149,29 @@ export const resetPasswordWithOTP = async (
     );
   }
 
-  if (passwordResetRequest.otpAttempts >= IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS) {
+  if (
+    passwordResetRequest.otpAttempts >= IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS
+  ) {
     throw new BadRequestError('Too many OTP attempts! Please try again later.');
   }
 
-  const isValidOTP = hashTokenSHA256(otp) === passwordResetRequest.otpHash;
+  const computedOtpHash = hashTokenSHA256(otp);
+  const isValidOTP = timingSafeHashEqual(
+    computedOtpHash,
+    passwordResetRequest.otpHash
+  );
 
   if (!isValidOTP) {
     await prisma.passwordReset.update({
       where: { id: passwordResetRequest.id },
       data: {
-        otpAttempts: passwordResetRequest.otpAttempts + 1,
+        otpAttempts: { increment: 1 },
       },
     });
 
     const attemptsRemaining =
-      IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS - (passwordResetRequest.otpAttempts + 1);
+      IAM_PASSWORD_CONFIG.OTP.MAX_ATTEMPTS -
+      (passwordResetRequest.otpAttempts + 1);
 
     if (attemptsRemaining <= 0) {
       throw new BadRequestError(
@@ -213,21 +232,52 @@ export const resetPasswordWithOTP = async (
       });
     }
 
-    await tx.session.updateMany({
+    const activeSessions = await tx.session.findMany({
       where: { userId: user.id, revokedAt: null },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
-      },
+      select: { id: true },
     });
+
+    if (activeSessions.length > 0) {
+      const sessionIds = activeSessions.map((s) => s.id);
+      const pipeline = redis.pipeline();
+      for (const id of sessionIds) {
+        const key = REDIS_AUTH_KEYS.REVOKED_SESSION(id);
+        if (typeof (pipeline as any).setex === 'function') {
+          (pipeline as any).setex(
+            key,
+            EDGE_REVOCATION_TTL_SECONDS,
+            REDIS_REVOKED_SENTINEL
+          );
+        } else {
+          pipeline.set(key, REDIS_REVOKED_SENTINEL, {
+            ex: EDGE_REVOCATION_TTL_SECONDS,
+          });
+        }
+      }
+
+      await pipeline.exec();
+
+      await tx.session.updateMany({
+        where: { id: { in: sessionIds } },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
+        },
+      });
+    }
   }, IAM_TRANSACTION_OPTIONS);
+
+  await unlockAccount(user.email);
 
   enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
     userId: user.id,
     email: user.email,
     username: user.username,
   }).catch((err: Error) =>
-    logger.error({ error: err.message, userId: user.id }, 'Failed to enqueue password reset confirmation email')
+    logger.error(
+      { error: err.message, userId: user.id },
+      'Failed to enqueue password reset confirmation email'
+    )
   );
 
   logger.info({
@@ -267,8 +317,12 @@ export const resetPasswordWithToken = async (
     throw new UnauthorizedError('Invalid or expired reset link!');
   }
 
-  const isValidToken =
-    hashTokenSHA256(token) === passwordResetRequest.tokenHash;
+  const computedTokenHash = hashTokenSHA256(token);
+
+  const isValidToken = timingSafeHashEqual(
+    computedTokenHash,
+    passwordResetRequest.tokenHash
+  );
 
   if (!isValidToken) {
     throw new UnauthorizedError('Invalid or expired reset link!');
@@ -328,21 +382,51 @@ export const resetPasswordWithToken = async (
       });
     }
 
-    await tx.session.updateMany({
+    const activeSessions = await tx.session.findMany({
       where: { userId: passwordResetRequest.userId, revokedAt: null },
-      data: {
-        revokedAt: new Date(),
-        revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
-      },
+      select: { id: true },
     });
+
+    if (activeSessions.length > 0) {
+      const sessionIds = activeSessions.map((s) => s.id);
+      const pipeline = redis.pipeline();
+      for (const id of sessionIds) {
+        const key = REDIS_AUTH_KEYS.REVOKED_SESSION(id);
+        if (typeof (pipeline as any).setex === 'function') {
+          (pipeline as any).setex(
+            key,
+            EDGE_REVOCATION_TTL_SECONDS,
+            REDIS_REVOKED_SENTINEL
+          );
+        } else {
+          pipeline.set(key, REDIS_REVOKED_SENTINEL, {
+            ex: EDGE_REVOCATION_TTL_SECONDS,
+          });
+        }
+      }
+      await pipeline.exec();
+
+      await tx.session.updateMany({
+        where: { id: { in: sessionIds } },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: SESSION_REVOCATION_REASONS.PASSWORD_RESET,
+        },
+      });
+    }
   }, IAM_TRANSACTION_OPTIONS);
+
+  await unlockAccount(passwordResetRequest.user.email);
 
   enqueueNotification(NotificationEvent.PASSWORD_RESET_COMPLETED, {
     userId: passwordResetRequest.userId,
     email: passwordResetRequest.user.email,
     username: passwordResetRequest.user.username,
   }).catch((err: Error) =>
-    logger.error({ error: err.message, userId: passwordResetRequest.userId }, 'Failed to enqueue password reset confirmation email')
+    logger.error(
+      { error: err.message, userId: passwordResetRequest.userId },
+      'Failed to enqueue password reset confirmation email'
+    )
   );
 
   logger.info({

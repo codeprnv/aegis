@@ -55,8 +55,13 @@ export const enqueueNotification = async <T extends NotificationEvent>(
   payload: NotificationPayloadMap[T]
 ): Promise<void> => {
   const queue = getNotificationQueue();
+  const recipientId =
+    ('userId' in payload && payload.userId) ||
+    ('email' in payload && payload.email) ||
+    'anon';
+
   await queue.add(event, payload, {
-    jobId: `${event}:${payload.userId}:${Date.now()}`,
+    jobId: `${event}:${recipientId}:${Date.now()}`,
   });
 };
 

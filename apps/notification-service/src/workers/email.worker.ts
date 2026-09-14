@@ -2,93 +2,127 @@ import { logger } from '@aegis/common';
 import { notificationPrisma } from '@aegis/database';
 import { createBullMQConnection, NOTIFICATION_QUEUE_NAME } from '@aegis/events';
 import { NotificationStatus } from '@aegis/types';
-import { Job, Worker } from 'bullmq';
-import { sendEmail } from '../channels/email.channel';
+import { Job, UnrecoverableError, Worker } from 'bullmq';
+import {
+  PermanentDeliveryError,
+  sendEmail,
+  UnrecognizedEventError,
+} from '../channels/email.channel.js';
 import { NOTIFICATION_WORKER_CONFIG } from '../config/index.js';
 
+/**
+ * Initializes and starts the BullMQ worker for the notification email queue.
+ * Implements atomic PostgreSQL upserts to guarantee worker concurrency safety (NOTIF-01),
+ * captures full template and subject audit telemetry (NOTIF-02), and classifies
+ * non-retryable failures to prevent redundant BullMQ retry loops (NOTIF-05, NOTIF-06).
+ *
+ * @returns Active BullMQ Worker instance
+ */
 export const startEmailWorker = (): Worker => {
-  logger.info(`Starting BullMQ Email Worker...`);
+  logger.info('Starting BullMQ Email Worker...');
+
   const worker = new Worker(
     NOTIFICATION_QUEUE_NAME,
     async (job: Job) => {
-      logger.info(`Processing job ${job.id} (Event: ${job.name})`);
+      logger.info(
+        { jobId: job.id, event: job.name },
+        `Processing email notification job ${job.id}`
+      );
+
+      const idempotencyKey =
+        job.id || `${job.name}:${job.data?.userId || 'anon'}:${job.timestamp}`;
 
       try {
-        // Idempotency: Check if job is already processed
-        const existingNotification =
-          await notificationPrisma.notification.findUnique({
-            where: { idempotencyKey: job.id! },
-          });
-
-        if (
-          existingNotification &&
-          existingNotification.status === NotificationStatus.SENT
-        ) {
-          logger.info(`Job ${job.id} already processed. Skipping.`);
-          return;
-        }
-
-        let notificationId = existingNotification?.id;
-
-        if (!existingNotification) {
-          const newNotif = await notificationPrisma.notification.create({
-            data: {
-              eventType: job.name,
-              recipientId: job.data.userId || 'unknown',
-              recipientEmail: job.data.email,
-              idempotencyKey: job.id!,
-              status: NotificationStatus.PENDING,
-              attempts: 1,
-              lastAttemptAt: new Date(),
-            },
-          });
-          notificationId = newNotif.id;
-        } else {
-          await notificationPrisma.notification.update({
-            where: { id: existingNotification.id },
-            data: {
-              attempts: { increment: 1 },
-              lastAttemptAt: new Date(),
-            },
-          });
-        }
-
-        // Dispatch to email channel
-        const providerMessageId = await sendEmail(job.name, job.data);
-
-        await notificationPrisma.notification.update({
-          where: { id: notificationId },
-          data: {
-            status: NotificationStatus.SENT,
-            sentAt: new Date(),
-            providerMessageId: providerMessageId,
+        // Atomic Upsert (NOTIF-01): Prevents P2002 duplicate key crashes under concurrency
+        const notification = await notificationPrisma.notification.upsert({
+          where: { idempotencyKey },
+          create: {
+            eventType: job.name,
+            recipientId: job.data.userId || 'unknown',
+            recipientEmail: job.data.email,
+            idempotencyKey,
+            status: NotificationStatus.PENDING,
+            attempts: 1,
+            lastAttemptAt: new Date(),
+          },
+          update: {
+            attempts: { increment: 1 },
+            lastAttemptAt: new Date(),
           },
         });
 
-        logger.info(`Successfully processed job ${job.id}`);
-      } catch (error: any) {
-        logger.error(`Failed to process job ${job.id}: ${error.message}`);
-
-        // Log failure safely without masking the original exception
-        if (job.id) {
-          await notificationPrisma.notification
-            .updateMany({
-              where: { idempotencyKey: job.id },
-              data: {
-                status: NotificationStatus.FAILED,
-                errorMessage:
-                  error instanceof Error ? error.message : String(error),
-              },
-            })
-            .catch((dbErr) => {
-              logger.warn(
-                { dbErr },
-                `Could not update failure status for job ${job.id}`
-              );
-            });
+        // Skip execution if already successfully delivered
+        if (notification.status === NotificationStatus.SENT) {
+          logger.info(
+            { jobId: job.id },
+            `Job ${job.id} already marked as SENT. Skipping duplicate dispatch.`
+          );
+          return;
         }
 
-        throw error; // Throwing triggers BullMQ's automatic exponential backoff retry
+        // Dispatch to email channel (NOTIF-02, NOTIF-05, NOTIF-06)
+        const { messageId, subject, templateName } = await sendEmail(
+          job.name,
+          job.data
+        );
+
+        // Record successful dispatch and audit metadata in database
+        await notificationPrisma.notification.update({
+          where: { id: notification.id },
+          data: {
+            status: NotificationStatus.SENT,
+            subject,
+            templateName,
+            sentAt: new Date(),
+            providerMessageId: messageId || null,
+            errorMessage: null,
+          },
+        });
+
+        logger.info(
+          { jobId: job.id, messageId, templateName },
+          `Successfully dispatched email notification for job ${job.id}`
+        );
+      } catch (error: any) {
+        logger.error(
+          { jobId: job.id, error: error.message },
+          `Failed to process email job ${job.id}: ${error.message}`
+        );
+
+        const isUnrecognized = error instanceof UnrecognizedEventError;
+        const isPermanent = error instanceof PermanentDeliveryError;
+
+        let statusToRecord: NotificationStatus = NotificationStatus.FAILED;
+        if (isUnrecognized) {
+          statusToRecord = NotificationStatus.IGNORED;
+        } else if (isPermanent) {
+          statusToRecord = NotificationStatus.BOUNCED;
+        }
+
+        // Record failure state in database safely
+        await notificationPrisma.notification
+          .updateMany({
+            where: { idempotencyKey },
+            data: {
+              status: statusToRecord,
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
+            },
+          })
+          .catch((dbErr) => {
+            logger.warn(
+              { dbErr, jobId: job.id },
+              `Could not record failure state in database for job ${job.id}`
+            );
+          });
+
+        if (isUnrecognized || isPermanent) {
+          // Prevent BullMQ from retrying permanent bounces or unmapped events
+          throw new UnrecoverableError(error.message);
+        }
+
+        // Rethrow transient errors so BullMQ applies configured exponential backoff
+        throw error;
       }
     },
     {
@@ -99,7 +133,10 @@ export const startEmailWorker = (): Worker => {
   );
 
   worker.on('failed', (job, err) => {
-    logger.error(`Job ${job?.id} failed with error: ${err.message}`);
+    logger.error(
+      { jobId: job?.id, error: err.message },
+      `Notification job ${job?.id} permanently failed: ${err.message}`
+    );
   });
 
   return worker;

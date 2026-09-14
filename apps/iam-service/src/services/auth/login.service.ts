@@ -41,12 +41,6 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
   const { password, userAgent, ipAddress, rememberMe } = input;
   const email = input.email.toLowerCase().trim();
 
-  // Pre-authentication defense: Evaluate edge and persistent lockout state
-  const { locked, reason } = await isAccountLocked(email);
-  if (locked) {
-    throw new ForbiddenError(reason || 'Account is locked!');
-  }
-
   const user = await prisma.user.findUnique({
     where: { email },
     select: {
@@ -69,12 +63,6 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     throw new UnauthorizedError('Invalid email or password');
   }
 
-  if (!user.emailVerified) {
-    throw new ForbiddenError(
-      'Please verify your email address before logging in.'
-    );
-  }
-
   const isValidPassword = await verifyPassword(password, user.passwordHash);
   if (!isValidPassword) {
     const { shouldLock, attemptRemaining } = await recordFailedAttempt(
@@ -86,6 +74,18 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     }
     throw new UnauthorizedError(
       `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
+    );
+  }
+
+  // Pre-authentication defense: Evaluate edge and persistent lockout state
+  const { locked, reason } = await isAccountLocked(email);
+  if (locked) {
+    throw new ForbiddenError(reason || 'Account is locked!');
+  }
+
+  if (!user.emailVerified) {
+    throw new ForbiddenError(
+      'Please verify your email address before logging in.'
     );
   }
 
@@ -107,7 +107,6 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     const temporaryToken = issueRestrictedToken({
       userId: user.id,
       email: user.email,
-      role: user.role,
     });
     return {
       requiresPasswordChange: true,

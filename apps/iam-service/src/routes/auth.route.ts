@@ -11,6 +11,7 @@ import {
   registerRateLimiter,
   resetPasswordRateLimiter,
 } from '../middlewares/rateLimiter';
+import { requireAuth } from '../middlewares/requireAuth.js';
 
 const router: Router = express.Router();
 
@@ -34,6 +35,7 @@ router.post(
 router.get(
   '/me',
   requireInternalToken('iam-service'),
+  requireAuth,
   authController.getMeController
 );
 router.get('/verify-email', authController.verifyEmailController);
@@ -64,6 +66,7 @@ router.post(
 router.post(
   '/change-password',
   requireInternalToken('iam-service'),
+  requireAuth,
   passwordController.changePasswordController
 );
 
@@ -71,16 +74,19 @@ router.post(
 router.get(
   '/sessions',
   requireInternalToken('iam-service'),
+  requireAuth,
   sessionController.listSessionsHandler
 );
 router.delete(
   '/sessions/:sessionId',
   requireInternalToken('iam-service'),
+  requireAuth,
   sessionController.revokeSessionHandler
 );
 router.delete(
   '/sessions',
   requireInternalToken('iam-service'),
+  requireAuth,
   sessionController.revokeAllOtherSessionsHandler
 );
 

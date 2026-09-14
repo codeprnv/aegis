@@ -1,8 +1,4 @@
-import {
-  hashPassword,
-  logger,
-  verifyPassword,
-} from '@aegis/common';
+import { hashPassword, logger, verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
 import { ConflictError } from '@aegis/middlewares';
 import {
@@ -67,6 +63,7 @@ export const validateAndStorePassword = async (
         passwordHash: newPasswordHash,
         passwordChangedAt: new Date(),
         updatedAt: new Date(),
+        forcePasswordChange: false,
       },
     });
 

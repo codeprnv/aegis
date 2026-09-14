@@ -22,8 +22,12 @@ export const IAM_RATE_LIMIT_CONFIG = {
     MAX_REQUESTS: 3,
     REDIS_PREFIX: 'aegis:iam:rl:forgot-password:',
   },
+  FORGOT_PASSWORD_RESEND: {
+    COOLDOWN_SECONDS: 60,
+    REDIS_PREFIX: 'aegis:iam:cooldown:forgot-password:',
+  },
   RESET_PASSWORD: {
-    WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    WINDOW_MS: 2 * 60 * 1000, // 2 minutes
     MAX_REQUESTS: 5,
     REDIS_PREFIX: 'aegis:iam:rl:reset-password:',
   },
