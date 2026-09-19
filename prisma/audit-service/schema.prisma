@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/prisma-audit"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -------- Audit Service Models --------
+
+model TrustedDevice {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  deviceFingerprint String   @map("device_fingerprint")
+  deviceType        String?  @map("device_type")
+  deviceName        String?  @map("device_name")
+  browserName       String?  @map("browser_name")
+  osName            String?  @map("os_name")
+  ipAddress         String?  @map("ip_address")
+  city              String?
+  country           String?
+  isTrusted         Boolean  @default(false) @map("is_trusted")
+  firstSeenAt       DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt        DateTime @default(now()) @map("last_seen_at")
+
+  @@unique([userId, deviceFingerprint])
+  @@index([userId])
+  @@map("trusted_devices")
+}
+
+model SecurityAuditLog {
+  id        String   @id @default(uuid())
+  eventId   String   @unique @map("event_id")
+  userId    String?  @map("user_id")
+  action    String
+  status    String
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  city      String?
+  country   String?
+  latitude  Float?
+  longitude Float?
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("security_audit_logs")
+}

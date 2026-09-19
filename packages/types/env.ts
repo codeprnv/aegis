@@ -27,9 +27,7 @@ export const apiGatewayEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
-  ALLOWED_ORIGINS: z.coerce
-    .string<string>()
-    .default('http://localhost:3000'),
+  ALLOWED_ORIGINS: z.coerce.string<string>().default('http://localhost:3000'),
   IAM_SERVICE_PORT: z.coerce.number<number>().default(6000),
 });
 
@@ -72,6 +70,9 @@ export const auditServiceEnvSchema = downstreamServiceBase.extend({
   DATABASE_URL: z.coerce.string<string>().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.coerce.string<string>().optional(),
   UPSTASH_REDIS_URL: z.coerce.string<string>().optional(),
+  IPIFY_API_KEY: z.coerce.string<string>().optional(),
+  MAXMIND_DB_PATH: z.coerce.string<string>().optional(),
+  IPINFO_TOKEN: z.coerce.string<string>().optional(),
 });
 export const rolesServiceEnvSchema = downstreamServiceBase.extend({});
 

@@ -5,14 +5,16 @@
 export const EDGE_REVOCATION_TTL_SECONDS = 960;
 
 /**
- * Edge Redis keys and sentinels for session revocation.
+ * Edge Redis keys and sentinels for session and user-level revocation.
  */
 export const REDIS_AUTH_KEYS = {
   REVOKED_SESSION: (sessionId: string): string =>
     `aegis:revoked:session:${sessionId}`,
+  REVOKED_USER: (userId: string): string =>
+    `aegis:revoked:user:${userId}`,
 } as const;
 
 /**
- * Sentinel value written to Redis blocklist for revoked sessions.
+ * Sentinel value written to Redis blocklist for revoked sessions and accounts.
  */
 export const REDIS_REVOKED_SENTINEL = 'revoked';

@@ -32,32 +32,39 @@ export const extractAuthContext = async (
   try {
     const decodedToken = verifyAccessToken(token);
 
-    // If token has a sessionId, verify against the edge revocation blocklist
-    if (decodedToken.sessionId) {
-      try {
-        const isRevoked = await redis.get(
-          REDIS_AUTH_KEYS.REVOKED_SESSION(decodedToken.sessionId)
-        );
-        if (isRevoked) {
-          res.status(401).json({
-            status: 'error',
-            statusCode: 401,
-            message: 'Session has been revoked',
-          });
-          return;
-        }
-      } catch (redisError) {
-        // Fail-safe resilience: log a high-priority operational alert without crashing the edge
-        logger.error(
-          {
-            alert: 'EDGE_REVOCATION_BYPASS_ACTIVE',
-            securityRisk: 'HIGH',
-            sessionId: decodedToken.sessionId,
-            error: redisError,
-          },
-          'CRITICAL: Edge session revocation cache unreachable - fallback to raw JWT verification active'
-        );
+    // Verify against the edge revocation blocklist (session and user level)
+    try {
+      const [isSessionRevoked, isUserRevoked] = await Promise.all([
+        decodedToken.sessionId
+          ? redis.get(REDIS_AUTH_KEYS.REVOKED_SESSION(decodedToken.sessionId))
+          : null,
+        decodedToken.sub
+          ? redis.get(REDIS_AUTH_KEYS.REVOKED_USER(decodedToken.sub))
+          : null,
+      ]);
+
+      if (isSessionRevoked || isUserRevoked) {
+        res.status(401).json({
+          status: 'error',
+          statusCode: 401,
+          message: isUserRevoked
+            ? 'Account has been locked due to a security incident'
+            : 'Session has been revoked',
+        });
+        return;
       }
+    } catch (redisError) {
+      // Fail-safe resilience: log a high-priority operational alert without crashing the edge
+      logger.error(
+        {
+          alert: 'EDGE_REVOCATION_BYPASS_ACTIVE',
+          securityRisk: 'HIGH',
+          sessionId: decodedToken.sessionId,
+          userId: decodedToken.sub,
+          error: redisError,
+        },
+        'CRITICAL: Edge revocation cache unreachable - fallback to raw JWT verification active'
+      );
     }
 
     req.auth = {

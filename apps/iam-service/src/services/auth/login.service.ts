@@ -63,6 +63,12 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     throw new UnauthorizedError('Invalid email or password');
   }
 
+  // Pre-authentication defense: Evaluate edge and persistent lockout state (SEC-06)
+  const { locked, reason } = await isAccountLocked(email);
+  if (locked) {
+    throw new ForbiddenError(reason || 'Account is locked!');
+  }
+
   const isValidPassword = await verifyPassword(password, user.passwordHash);
   if (!isValidPassword) {
     const { shouldLock, attemptRemaining } = await recordFailedAttempt(
@@ -75,12 +81,6 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     throw new UnauthorizedError(
       `Invalid email or password. ${attemptRemaining} attempt(s) remaining before account lockout!`
     );
-  }
-
-  // Pre-authentication defense: Evaluate edge and persistent lockout state
-  const { locked, reason } = await isAccountLocked(email);
-  if (locked) {
-    throw new ForbiddenError(reason || 'Account is locked!');
   }
 
   if (!user.emailVerified) {

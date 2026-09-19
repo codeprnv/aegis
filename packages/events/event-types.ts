@@ -123,10 +123,13 @@ export interface AuthLoginSuccessPayload {
 }
 
 export interface AuthSessionRevokePayload {
-  sessionId: string;
+  sessionId?: string;
   userId: string;
   reason: string;
   source: 'AUDIT_SERVICE' | 'USER' | 'ADMIN';
+  lockAccount?: boolean;
+  forcePasswordChange?: boolean;
+  revokeAllUserSessions?: boolean;
 }
 
 export interface ImpossibleTravelPayload {

@@ -14,6 +14,9 @@
     },
     {
       "path": "./apps/notification-service"
+    },
+    {
+      "path": "./apps/audit-service"
     }
   ]
 }

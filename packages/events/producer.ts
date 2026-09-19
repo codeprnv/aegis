@@ -8,11 +8,14 @@ import type {
 } from './event-types.js';
 
 export const NOTIFICATION_QUEUE_NAME = 'aegis-notifications';
-export const SECURITY_QUEUE_NAME = 'aegis-security-events';
+export const SECURITY_TELEMETRY_QUEUE_NAME = 'aegis-security-telemetry';
+export const SECURITY_REVOCATION_QUEUE_NAME = 'aegis-security-revocations';
+export const SECURITY_QUEUE_NAME = SECURITY_REVOCATION_QUEUE_NAME;
 
-// Lazy initialize the queue connection
+// Lazy initialize the queue connections
 let notificationQueue: Queue | null = null;
-let securityQueue: Queue | null = null;
+let securityTelemetryQueue: Queue | null = null;
+let securityRevocationQueue: Queue | null = null;
 
 const getNotificationQueue = (): Queue => {
   if (!notificationQueue) {
@@ -32,9 +35,9 @@ const getNotificationQueue = (): Queue => {
   return notificationQueue;
 };
 
-const getSecurityQueue = (): Queue => {
-  if (!securityQueue) {
-    securityQueue = new Queue(SECURITY_QUEUE_NAME, {
+const getSecurityTelemetryQueue = (): Queue => {
+  if (!securityTelemetryQueue) {
+    securityTelemetryQueue = new Queue(SECURITY_TELEMETRY_QUEUE_NAME, {
       connection: createBullMQConnection() as any,
       defaultJobOptions: {
         attempts: 5,
@@ -47,7 +50,25 @@ const getSecurityQueue = (): Queue => {
       },
     });
   }
-  return securityQueue;
+  return securityTelemetryQueue;
+};
+
+const getSecurityRevocationQueue = (): Queue => {
+  if (!securityRevocationQueue) {
+    securityRevocationQueue = new Queue(SECURITY_REVOCATION_QUEUE_NAME, {
+      connection: createBullMQConnection() as any,
+      defaultJobOptions: {
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 1000,
+        },
+        removeOnComplete: { age: 3600 },
+        removeOnFail: false,
+      },
+    });
+  }
+  return securityRevocationQueue;
 };
 
 export const enqueueNotification = async <T extends NotificationEvent>(
@@ -65,11 +86,11 @@ export const enqueueNotification = async <T extends NotificationEvent>(
   });
 };
 
-export const enqueueSecurityEvent = async <T extends SecurityEvent>(
+export const enqueueSecurityTelemetry = async <T extends SecurityEvent>(
   event: T,
   payload: SecurityPayloadMap[T]
 ): Promise<void> => {
-  const queue = getSecurityQueue();
+  const queue = getSecurityTelemetryQueue();
   const eventId =
     'eventId' in payload && payload.eventId
       ? payload.eventId
@@ -80,15 +101,46 @@ export const enqueueSecurityEvent = async <T extends SecurityEvent>(
   });
 };
 
+export const enqueueSecurityRevocation = async <T extends SecurityEvent>(
+  event: T,
+  payload: SecurityPayloadMap[T]
+): Promise<void> => {
+  const queue = getSecurityRevocationQueue();
+  const eventId =
+    'eventId' in payload && payload.eventId
+      ? payload.eventId
+      : `${event}:${'userId' in payload ? payload.userId : 'system'}:${Date.now()}`;
+
+  await queue.add(event, payload, {
+    jobId: eventId,
+  });
+};
+
+export const enqueueSecurityEvent = async <T extends SecurityEvent>(
+  event: T,
+  payload: SecurityPayloadMap[T]
+): Promise<void> => {
+  if (event === 'auth.session.revoke') {
+    return enqueueSecurityRevocation(event, payload);
+  }
+  return enqueueSecurityTelemetry(event, payload);
+};
+
 export const closeQueues = async (): Promise<void> => {
+  const closures: Promise<void>[] = [];
   if (notificationQueue) {
-    await notificationQueue.close();
+    closures.push(notificationQueue.close());
     notificationQueue = null;
   }
-  if (securityQueue) {
-    await securityQueue.close();
-    securityQueue = null;
+  if (securityTelemetryQueue) {
+    closures.push(securityTelemetryQueue.close());
+    securityTelemetryQueue = null;
   }
+  if (securityRevocationQueue) {
+    closures.push(securityRevocationQueue.close());
+    securityRevocationQueue = null;
+  }
+  await Promise.all(closures);
 };
 
 export const closeNotificationQueue = closeQueues;

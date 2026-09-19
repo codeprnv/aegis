@@ -1,5 +1,5 @@
 import { prisma, redis } from '@aegis/database';
-import { SECURITY_QUEUE_NAME, SecurityEvent } from '@aegis/events';
+import { SECURITY_REVOCATION_QUEUE_NAME, SecurityEvent } from '@aegis/events';
 import { Worker } from 'bullmq';
 import { startSecurityWorker } from '../workers/security.worker';
 
@@ -37,7 +37,7 @@ jest.mock('@aegis/common', () => ({
 }));
 
 jest.mock('@aegis/events', () => ({
-  SECURITY_QUEUE_NAME: 'aegis-security-events',
+  SECURITY_REVOCATION_QUEUE_NAME: 'aegis-security-revocations',
   SecurityEvent: {
     AUTH_SESSION_REVOKE: 'auth.session.revoke',
   },
@@ -54,7 +54,7 @@ describe('Security Worker', () => {
     const worker = startSecurityWorker();
 
     expect(Worker).toHaveBeenCalledWith(
-      SECURITY_QUEUE_NAME,
+      SECURITY_REVOCATION_QUEUE_NAME,
       expect.any(Function),
       expect.objectContaining({ concurrency: 5 })
     );
