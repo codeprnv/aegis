@@ -3,7 +3,7 @@ services:
     name: aegis-backend
     runtime: image
     image:
-      url: ghcr.io/codeprnv/aegis/aegis-backend:latest
+      url: ghcr.io/codeprnv/aegis-backend:latest
     region: singapore
     plan: free
     healthCheckPath: /gateway-health
