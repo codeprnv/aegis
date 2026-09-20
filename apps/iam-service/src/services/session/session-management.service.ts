@@ -262,12 +262,19 @@ export const logoutService = async (
         id: sessionId,
         userId,
       },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: SESSION_REVOCATION_REASONS.MANUAL_USER_LOGOUT,
+      },
     });
 
-    await redis.setex(
-      REDIS_AUTH_KEYS.REVOKED_SESSION(sessionId),
-      EDGE_REVOCATION_TTL_SECONDS,
-      REDIS_REVOKED_SENTINEL
-    );
+    const key = REDIS_AUTH_KEYS.REVOKED_SESSION(sessionId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof (redis as any).setex === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (redis as any).setex(key, EDGE_REVOCATION_TTL_SECONDS, REDIS_REVOKED_SENTINEL);
+    } else {
+      await redis.set(key, REDIS_REVOKED_SENTINEL, { ex: EDGE_REVOCATION_TTL_SECONDS });
+    }
   }
 };

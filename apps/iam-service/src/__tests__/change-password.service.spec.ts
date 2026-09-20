@@ -1,6 +1,5 @@
-import { logger, validatePassword, verifyPassword } from '@aegis/common';
+import { verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
-import { BadRequestError } from '@aegis/middlewares';
 const {
   canUsePassword,
   validateAndStorePassword,

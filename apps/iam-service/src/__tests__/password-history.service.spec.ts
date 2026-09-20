@@ -1,6 +1,5 @@
 import { hashPassword, verifyPassword } from '@aegis/common';
 import { prisma } from '@aegis/database';
-import { ConflictError } from '@aegis/middlewares';
 import { IAM_PASSWORD_CONFIG } from '../config/index.js';
 import {
   canUsePassword,
@@ -37,7 +36,6 @@ jest.mock('@aegis/common', () => ({
 describe('Password History Service', () => {
   const userId = 'user-123';
   const newPassword = 'NewPassword@123';
-  const hashedPassword = 'hashed-new-password';
 
   // Clear all the previous mocks before running new mock
   beforeEach(() => {

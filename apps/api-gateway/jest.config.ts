@@ -13,4 +13,5 @@ export default {
     '^@aegis/middlewares$': '<rootDir>/../../packages/middlewares/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/dist/'],
 };

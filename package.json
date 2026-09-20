@@ -10,7 +10,8 @@
     "test": "npx jest",
     "prisma:generate:iam": "prisma generate --schema=prisma/iam-service/schema.prisma",
     "prisma:generate:notification": "prisma generate --schema=prisma/notification-service/schema.prisma",
-    "prisma:generate": "npm run prisma:generate:iam && npm run prisma:generate:notification"
+    "prisma:generate:audit": "prisma generate --schema=prisma/audit-service/schema.prisma",
+    "prisma:generate": "npm run prisma:generate:iam && npm run prisma:generate:notification && npm run prisma:generate:audit"
   },
   "private": true,
   "dependencies": {

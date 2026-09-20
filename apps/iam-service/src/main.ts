@@ -12,7 +12,7 @@ dotenv.config({
 const env = iamServiceEnvSchema.parse(process.env);
 Object.freeze(env);
 
-import { disconnectPrisma, prisma, redis } from '@aegis/database';
+import { disconnectPrisma, prisma } from '@aegis/database';
 import {
   accessLogger,
   createSanitizeHeaders,
@@ -99,7 +99,6 @@ process.on('SIGTERM', async () => {
   server.close(async () => {
     try {
       await securityWorker.close();
-      await redis.quit();
       await disconnectPrisma();
     } catch (err) {
       logger.error(err, 'Error during graceful shutdown');
@@ -113,7 +112,6 @@ process.on('SIGINT', async () => {
   server.close(async () => {
     try {
       await securityWorker.close();
-      await redis.quit();
       await disconnectPrisma();
     } catch (err) {
       logger.error(err, 'Error during graceful shutdown');

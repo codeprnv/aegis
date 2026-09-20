@@ -5,7 +5,7 @@ import {
   validatePassword,
 } from '@aegis/common';
 import { prisma, redis } from '@aegis/database';
-import { BadRequestError, ConflictError } from '@aegis/middlewares';
+import { BadRequestError } from '@aegis/middlewares';
 import { randomBytes, randomUUID } from 'crypto';
 import {
   IAM_REGISTRATION_CONFIG,

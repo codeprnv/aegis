@@ -10,7 +10,8 @@ const redisClient = new RedisClient(process.env.REDIS_URL || 'redis://localhost:
  */
 export const refreshRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: IAM_RATE_LIMIT_CONFIG.REFRESH.REDIS_PREFIX,
   }),
   windowMs: IAM_RATE_LIMIT_CONFIG.REFRESH.WINDOW_MS,
@@ -28,7 +29,8 @@ export const refreshRateLimiter = rateLimit({
  */
 export const loginRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: IAM_RATE_LIMIT_CONFIG.LOGIN.REDIS_PREFIX,
   }),
   windowMs: IAM_RATE_LIMIT_CONFIG.LOGIN.WINDOW_MS,
@@ -46,7 +48,8 @@ export const loginRateLimiter = rateLimit({
  */
 export const registerRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: IAM_RATE_LIMIT_CONFIG.REGISTER.REDIS_PREFIX,
   }),
   windowMs: IAM_RATE_LIMIT_CONFIG.REGISTER.WINDOW_MS,
@@ -64,7 +67,8 @@ export const registerRateLimiter = rateLimit({
  */
 export const forgotPasswordRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: IAM_RATE_LIMIT_CONFIG.FORGOT_PASSWORD.REDIS_PREFIX,
   }),
   windowMs: IAM_RATE_LIMIT_CONFIG.FORGOT_PASSWORD.WINDOW_MS,
@@ -90,7 +94,8 @@ export const forgotPasswordRateLimiter = rateLimit({
  */
 export const resetPasswordRateLimiter = rateLimit({
   store: new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      redisClient.call(args[0], ...args.slice(1)) as any,
     prefix: IAM_RATE_LIMIT_CONFIG.RESET_PASSWORD.REDIS_PREFIX,
   }),
   windowMs: IAM_RATE_LIMIT_CONFIG.RESET_PASSWORD.WINDOW_MS,

@@ -1,6 +1,6 @@
 process.env.SERVICE_NAME = 'notification-service';
 
-import { logger, SERVICE_NAMES } from '@aegis/common';
+import { logger } from '@aegis/common';
 import express from 'express';
 import { NOTIFICATION_SERVER_CONFIG } from './config/index.js';
 import { checkHealth } from './health';

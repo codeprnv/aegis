@@ -14,7 +14,7 @@ const env = apiGatewayEnvSchema.parse(process.env);
 
 Object.freeze(env);
 
-import { HTTP_HEADERS, HTTP_STATUS, logger } from '@aegis/common';
+import { HTTP_HEADERS, logger } from '@aegis/common';
 import { createServiceProxy } from '@aegis/gateway';
 import {
   accessLogger,

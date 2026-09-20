@@ -9,7 +9,12 @@
   "include": [
     "src/**/*.ts",
     "../../packages/**/*.ts",
-    "../iam-service/src/middlewares/rateLimiter.ts"
+    "../../packages/**/*.tsx"
   ],
-  "exclude": []
+  "exclude": [
+    "dist",
+    "out-tsc",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts"
+  ]
 }
