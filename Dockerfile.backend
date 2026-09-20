@@ -1,0 +1,54 @@
+# ==============================================================================
+# Multi-Stage Production Dockerfile for Aegis Backend Microservice Mesh
+# Stage 1: Builder (Generates Prisma in-process clients and compiles Nx apps)
+# Stage 2: Runner (Lightweight Alpine runtime with PM2 supervisor)
+# ==============================================================================
+
+# Stage 1: Build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Install native build tools for modules like argon2
+RUN apk add --no-cache python3 make g++
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# Generate all 3 Prisma schema clients with in-process library engine
+RUN npx prisma generate --schema=prisma/iam-service/schema.prisma && \
+    npx prisma generate --schema=prisma/notification-service/schema.prisma && \
+    npx prisma generate --schema=prisma/audit-service/schema.prisma
+
+# Build all 4 microservices with Nx (controlled concurrency of 2 to bound peak RAM)
+RUN npx nx run-many -t build -p api-gateway iam-service notification-service audit-service --parallel=2
+
+# Stage 2: Lean Production Runtime with PM2
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Install dumb-init for PID 1 signal handling and global PM2 runtime
+RUN apk add --no-cache dumb-init && npm install -g pm2
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Copy generated Prisma clients
+COPY --from=builder /app/generated ./generated
+
+# Copy built service bundles
+COPY --from=builder /app/apps/api-gateway/dist ./apps/api-gateway/dist
+COPY --from=builder /app/apps/iam-service/dist ./apps/iam-service/dist
+COPY --from=builder /app/apps/notification-service/dist ./apps/notification-service/dist
+COPY --from=builder /app/apps/audit-service/dist ./apps/audit-service/dist
+
+# Copy PM2 supervisor configs and create directory for runtime assets
+COPY ecosystem.config.cjs ecosystem.config.js ./
+RUN mkdir -p data
+
+EXPOSE 8080 6000 6001 6004
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["pm2-runtime", "ecosystem.config.cjs"]

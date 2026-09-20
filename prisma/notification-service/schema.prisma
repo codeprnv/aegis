@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../../generated/prisma-notification"
+  provider   = "prisma-client-js"
+  output     = "../../generated/prisma-notification"
+  engineType = "library"
 }
 
 datasource db {

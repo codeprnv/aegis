@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: aegis-backend
+    runtime: image
+    image:
+      url: ghcr.io/codeprnv/aegis/aegis-backend:latest
+    region: singapore
+    plan: free
+    healthCheckPath: /gateway-health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: API_GATEWAY_PORT
+        value: 8080
+      - key: HOST
+        value: http://localhost
+      - key: ORIGIN_HOST_1
+        value: https://aegis.codeprnv.org
+      - key: ALLOWED_ORIGINS
+        value: https://aegis.codeprnv.org
+      - key: FRONTEND_URL
+        value: https://aegis.codeprnv.org
+      - key: API_GATEWAY_URL
+        value: https://aegis.codeprnv.org
+      - key: AUDIT_HOST
+        value: 0.0.0.0
+      - key: AUDIT_SERVICE_PORT
+        value: 6004
+      - key: IAM_SERVICE_PORT
+        value: 6000
+      - key: NOTIFICATION_SERVICE_PORT
+        value: 6001
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: INTERNAL_JWT_PRIVATE_KEY_B64
+        sync: false
+      - key: API_GATEWAY_PUBLIC_KEY_B64
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: Aegis Security <noreply@codeprnv.org>

@@ -6,7 +6,7 @@
 // ============================================================
 
 
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { buildCookieHeader } from './cookie-utils';
 import { getCorrelationId } from './request-context';
@@ -20,6 +20,45 @@ export interface ServerFetchResult<T = unknown> {
   status: number;
 }
 
+/**
+ * Extracts and sanitizes client telemetry and IP information from the incoming request.
+ * Prioritizes trusted proxy headers before falling back to X-Forwarded-For or localhost.
+ */
+async function getClientTelemetryHeaders(): Promise<Record<string, string>> {
+  try {
+    const incomingHeaders = await headers();
+    const rawForwardedFor = incomingHeaders.get('x-forwarded-for');
+    const realIp =
+      incomingHeaders.get('cf-connecting-ip') ||
+      incomingHeaders.get('x-real-ip') ||
+      (rawForwardedFor ? rawForwardedFor.split(',')[0].trim() : '127.0.0.1');
+
+    const telemetryHeaders: Record<string, string> = {
+      'X-Forwarded-For': realIp,
+      'X-Real-IP': realIp,
+    };
+
+    const userAgent = incomingHeaders.get('user-agent');
+    if (userAgent) telemetryHeaders['User-Agent'] = userAgent;
+
+    const acceptLanguage = incomingHeaders.get('accept-language');
+    if (acceptLanguage) telemetryHeaders['Accept-Language'] = acceptLanguage;
+
+    const secChUa = incomingHeaders.get('sec-ch-ua');
+    if (secChUa) telemetryHeaders['Sec-CH-UA'] = secChUa;
+
+    const secChUaPlatform = incomingHeaders.get('sec-ch-ua-platform');
+    if (secChUaPlatform) telemetryHeaders['Sec-CH-UA-Platform'] = secChUaPlatform;
+
+    return telemetryHeaders;
+  } catch {
+    return {
+      'X-Forwarded-For': '127.0.0.1',
+      'X-Real-IP': '127.0.0.1',
+    };
+  }
+}
+
 export async function serverFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
@@ -27,6 +66,7 @@ export async function serverFetch<T = unknown>(
   const url = `${API_BASE_URL}${path}`;
   const cookieHeader = await buildCookieHeader();
   const correlationId = await getCorrelationId();
+  const telemetryHeaders = await getClientTelemetryHeaders();
 
   const fetchOptions: RequestInit = {
     ...options,
@@ -34,6 +74,7 @@ export async function serverFetch<T = unknown>(
       'Content-Type': 'application/json',
       'X-Correlation-ID': correlationId,
       Cookie: cookieHeader,
+      ...telemetryHeaders,
       ...options.headers,
     },
     cache: options.cache ?? 'no-store',

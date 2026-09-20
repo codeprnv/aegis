@@ -1,0 +1,45 @@
+name: Build & Push Backend Container to GHCR
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'apps/frontend/**'
+      - '*.md'
+      - '.agent/**'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase Repository Name for Docker Tag
+        run: |
+          echo "IMAGE_TAG=ghcr.io/$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')/aegis-backend:latest" >> $GITHUB_ENV
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: true
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

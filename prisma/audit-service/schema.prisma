@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../../generated/prisma-audit"
+  provider   = "prisma-client-js"
+  output     = "../../generated/prisma-audit"
+  engineType = "library"
 }
 
 datasource db {
