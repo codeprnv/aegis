@@ -49,6 +49,13 @@ COPY --from=builder /app/apps/iam-service/dist ./apps/iam-service/dist
 COPY --from=builder /app/apps/notification-service/dist ./apps/notification-service/dist
 COPY --from=builder /app/apps/audit-service/dist ./apps/audit-service/dist
 
+# Enforce CommonJS module boundary for compiled webpack microservice bundles
+RUN echo '{"type": "commonjs"}' > ./apps/package.json && \
+    echo '{"type": "commonjs"}' > ./apps/api-gateway/dist/package.json && \
+    echo '{"type": "commonjs"}' > ./apps/iam-service/dist/package.json && \
+    echo '{"type": "commonjs"}' > ./apps/notification-service/dist/package.json && \
+    echo '{"type": "commonjs"}' > ./apps/audit-service/dist/package.json
+
 # Copy PM2 supervisor configs and create directory for runtime assets
 COPY ecosystem.config.cjs ecosystem.config.js ./
 RUN mkdir -p data
