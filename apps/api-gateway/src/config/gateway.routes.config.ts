@@ -10,8 +10,10 @@ export const GATEWAY_ROUTES = {
   V1_PREFIX: '/v1',
   AUTH: '/auth',
   ADMIN: '/admin',
+  AUDIT: '/audit',
   UPSTREAM_IAM_AUTH_PREFIX: '/internal/v1/auth',
   UPSTREAM_IAM_ADMIN_PREFIX: '/internal/v1/admin',
+  UPSTREAM_AUDIT_PREFIX: '/internal/v1/audit',
 } as const;
 
 /**
@@ -20,6 +22,15 @@ export const GATEWAY_ROUTES = {
 export const GATEWAY_PROXY_CONFIG = {
   IAM_SERVICE: {
     name: SERVICE_NAMES.IAM,
+    timeoutMs: 8000,
+    circuitBreaker: {
+      enabled: true,
+      resetTimeout: 20000,
+      errorThreshold: 75,
+    },
+  },
+  AUDIT_SERVICE: {
+    name: SERVICE_NAMES.AUDIT,
     timeoutMs: 8000,
     circuitBreaker: {
       enabled: true,

@@ -46,6 +46,7 @@ export const startAnomalyWorker = (): Worker => {
         userId,
         sessionId,
         email,
+        username,
         ipAddress,
         userAgent,
         deviceFingerprint,
@@ -131,6 +132,7 @@ export const startAnomalyWorker = (): Worker => {
               await incidentMitigationService.notifyNewDevice({
                 userId,
                 email,
+                username,
                 deviceName,
                 browserName,
                 osName,
@@ -257,6 +259,7 @@ export const startAnomalyWorker = (): Worker => {
                   userId,
                   sessionId,
                   email,
+                  username,
                   ipAddress,
                   currentCity: geo.city,
                   previousCity: prev.city,

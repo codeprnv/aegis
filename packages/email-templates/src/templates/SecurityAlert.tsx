@@ -107,44 +107,46 @@ export const SecurityAlert: React.FC<SecurityAlertProps> = ({
                   Incident Intelligence
                 </Text>
 
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">Incident Type:</span>
-                    <span className="text-rose-400 font-mono font-bold">
-                      {alertType}
-                    </span>
-                  </div>
-                  {alertType === 'IMPOSSIBLE_TRAVEL' && (
-                    <>
-                      <div className="flex justify-between py-1 border-b border-zinc-800">
-                        <span className="text-zinc-400">Travel Vector:</span>
-                        <span className="text-white font-medium">
-                          {previousCity} &rarr; {currentCity}
-                        </span>
-                      </div>
-                      {typeof velocityKmH === 'number' && (
-                        <div className="flex justify-between py-1 border-b border-zinc-800">
-                          <span className="text-zinc-400">
-                            Calculated Velocity:
-                          </span>
-                          <span className="text-rose-300 font-mono font-bold">
-                            {Math.round(velocityKmH).toLocaleString()} km/h
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">Flagged IP:</span>
-                    <span className="text-brand font-mono">{ipAddress}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-zinc-400">Timestamp:</span>
-                    <span className="text-white font-medium">
-                      {formattedDate}
-                    </span>
-                  </div>
-                </div>
+                <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Incident Type:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#f87171', fontFamily: 'monospace', fontWeight: 'bold', fontSize: '12px' }}>
+                        {alertType}
+                      </td>
+                    </tr>
+                    {alertType === 'IMPOSSIBLE_TRAVEL' && (
+                      <>
+                        <tr style={{ borderBottom: '1px solid #27272a' }}>
+                          <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Travel Vector:</td>
+                          <td align="right" style={{ padding: '6px 0', color: '#ffffff', fontWeight: 500, fontSize: '12px' }}>
+                            {previousCity} &rarr; {currentCity}
+                          </td>
+                        </tr>
+                        {typeof velocityKmH === 'number' && (
+                          <tr style={{ borderBottom: '1px solid #27272a' }}>
+                            <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Calculated Velocity:</td>
+                            <td align="right" style={{ padding: '6px 0', color: '#fda4af', fontFamily: 'monospace', fontWeight: 'bold', fontSize: '12px' }}>
+                              {Math.round(velocityKmH).toLocaleString()} km/h
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    )}
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Flagged IP:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 500, fontSize: '12px' }}>
+                        {ipAddress}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Timestamp:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#a1a1aa', fontFamily: 'monospace', fontSize: '12px' }}>
+                        {formattedDate}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </Section>
 
               {/* Action Section */}

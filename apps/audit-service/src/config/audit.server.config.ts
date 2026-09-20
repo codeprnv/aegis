@@ -18,6 +18,6 @@ export interface AuditServerConfig {
 
 export const auditServerConfig: AuditServerConfig = {
   port: parseInt(process.env.AUDIT_SERVICE_PORT || '6004', 10),
-  host: process.env.HOST || '0.0.0.0',
+  host: process.env.AUDIT_HOST || '0.0.0.0',
   shutdownTimeoutMs: 10000,
 };

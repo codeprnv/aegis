@@ -19,7 +19,7 @@ interface PasswordResetProps {
   username: string;
   /** 6-digit one-time password code. */
   otp: string;
-  /** Fully qualified browser URL to the reset-password endpoint. */
+  /** Fully qualified browser URL to the forgot-password endpoint. */
   resetUrl?: string;
 }
 
@@ -31,7 +31,7 @@ interface PasswordResetProps {
 export const PasswordReset = ({
   username = 'Operator',
   otp = '000000',
-  resetUrl = 'http://localhost:3000/reset-password',
+  resetUrl = 'http://localhost:3000/forgot-password',
 }: PasswordResetProps) => {
   return (
     <Html>

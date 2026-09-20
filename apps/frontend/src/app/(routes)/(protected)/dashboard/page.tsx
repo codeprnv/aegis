@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { ShieldCheck, ArrowRight } from 'lucide-react';
 import { CardSpotlight } from '@/components/aceternity/card-spotlight';
 import { BackgroundRippleEffect } from '@/components/ui/background-ripple-effect';
 import { serverFetch } from '@/lib/server-fetch';
@@ -72,7 +74,7 @@ export default async function DashboardPage() {
               </h1>
             </div>
 
-            <div className="space-y-4 mb-8">
+            <div className="space-y-4 mb-6">
               <div className="p-4 rounded-xl bg-white/[0.05] border border-white/[0.1]">
                 <p className="text-sm text-slate-400 mb-1">Email</p>
                 <p className="text-lg text-white">{user.email}</p>
@@ -87,6 +89,28 @@ export default async function DashboardPage() {
                   {user.role}
                 </p>
               </div>
+            </div>
+
+            <div className="mb-8">
+              <Link
+                href="/settings/security"
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">
+                      Security Center
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Active sessions, trusted devices &amp; audit trail
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-emerald-400 transform group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
 
             <LogoutButton />

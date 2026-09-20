@@ -82,7 +82,7 @@ export const EMAIL_TEMPLATE_REGISTRY: Record<string, EmailTemplateDefinition> =
       templateName: PasswordReset.name,
       subject: EMAIL_SUBJECTS[NotificationEvent.PASSWORD_RESET_REQUESTED],
       component: PasswordReset,
-      resolveProps: withUrl('/reset-password', 'resetUrl'),
+      resolveProps: withUrl('/forgot-password', 'resetUrl'),
     },
 
     [NotificationEvent.PASSWORD_CHANGED]: {

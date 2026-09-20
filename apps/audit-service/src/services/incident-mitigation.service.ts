@@ -16,6 +16,7 @@ export interface ImpossibleTravelIncidentContext {
   userId: string;
   sessionId: string;
   email: string;
+  username?: string;
   ipAddress: string;
   currentCity?: string;
   previousCity?: string;
@@ -26,6 +27,7 @@ export interface ImpossibleTravelIncidentContext {
 export interface NewDeviceIncidentContext {
   userId: string;
   email: string;
+  username?: string;
   deviceName?: string;
   browserName?: string;
   osName?: string;
@@ -121,6 +123,7 @@ export class IncidentMitigationService {
       await enqueueNotification(NotificationEvent.URGENT_SECURITY_ALERT, {
         userId: ctx.userId,
         email: ctx.email,
+        username: ctx.username,
         alertType: 'IMPOSSIBLE_TRAVEL',
         ipAddress: ctx.ipAddress,
         currentCity: ctx.currentCity,
@@ -151,13 +154,14 @@ export class IncidentMitigationService {
       await enqueueNotification(NotificationEvent.SECURITY_LOGIN_ALERT, {
         userId: ctx.userId,
         email: ctx.email,
+        username: ctx.username,
         deviceName: ctx.deviceName,
         browserName: ctx.browserName,
         osName: ctx.osName,
         ipAddress: ctx.ipAddress,
         location: ctx.location,
         timestamp: ctx.timestamp,
-        reviewUrl: `${this.frontendUrl}/settings/security/devices`,
+        reviewUrl: `${this.frontendUrl}/settings/security`,
       });
     } catch (err: unknown) {
       logger.error(

@@ -36,7 +36,7 @@ app.use('/internal/v1/audit', auditRoutes);
 // Structured error handling middleware
 app.use(errorMiddleware);
 
-const server = app.listen(port, auditServerConfig.host, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   logger.info(`Audit Service listening on port ${port}`);
 });
 

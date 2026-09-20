@@ -60,7 +60,7 @@ RUN echo '{"type": "commonjs"}' > ./apps/package.json && \
 COPY ecosystem.config.cjs ecosystem.config.js ./
 RUN mkdir -p data
 
-EXPOSE 8080 6000 6001 6004
+EXPOSE 8080
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["pm2-runtime", "ecosystem.config.cjs"]

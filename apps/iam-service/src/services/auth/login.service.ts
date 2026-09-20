@@ -179,6 +179,7 @@ export const loginUser = async (input: LoginInput): Promise<AuthResponse> => {
     userId: user.id,
     sessionId,
     email: user.email,
+    username: user.username,
     ipAddress: ipAddress || '127.0.0.1',
     userAgent: userAgent || 'unknown',
     deviceFingerprint: effectiveFingerprint,

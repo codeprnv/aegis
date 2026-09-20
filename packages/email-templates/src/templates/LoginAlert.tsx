@@ -84,34 +84,40 @@ export const LoginAlert: React.FC<LoginAlertProps> = ({
                   Session Telemetry
                 </Text>
 
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">Device & OS:</span>
-                    <span className="text-white font-medium">
-                      {deviceName} ({osName})
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">Browser:</span>
-                    <span className="text-white font-medium">
-                      {browserName}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">IP Address:</span>
-                    <span className="text-brand font-mono">{ipAddress}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-zinc-800">
-                    <span className="text-zinc-400">Location:</span>
-                    <span className="text-white font-medium">{location}</span>
-                  </div>
-                  <div className="flex justify-between py-1">
-                    <span className="text-zinc-400">Time:</span>
-                    <span className="text-white font-medium">
-                      {formattedDate}
-                    </span>
-                  </div>
-                </div>
+                <table width="100%" cellPadding={0} cellSpacing={0} style={{ borderCollapse: 'collapse' }}>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Device &amp; OS:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#ffffff', fontWeight: 500, fontSize: '12px' }}>
+                        {deviceName} ({osName})
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Browser:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#ffffff', fontWeight: 500, fontSize: '12px' }}>
+                        {browserName}
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>IP Address:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 500, fontSize: '12px' }}>
+                        {ipAddress}
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #27272a' }}>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Location:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#ffffff', fontWeight: 500, fontSize: '12px' }}>
+                        {location}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '6px 0', color: '#a1a1aa', fontSize: '12px' }}>Time:</td>
+                      <td align="right" style={{ padding: '6px 0', color: '#a1a1aa', fontFamily: 'monospace', fontSize: '12px' }}>
+                        {formattedDate}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </Section>
 
               {/* CTA */}

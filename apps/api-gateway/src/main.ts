@@ -33,18 +33,26 @@ import {
   GATEWAY_ROUTES,
 } from './config/index.js';
 import { gatewayRequireAuth } from './middlewares/gatewayRequireAuth.js';
-import { authRateLimiter, rateLimiter } from './utils/rate-limit.js';
+import {
+  auditRateLimiter,
+  authRateLimiter,
+  probeRateLimiter,
+  rateLimiter,
+} from './utils/rate-limit.js';
 
 const {
   HOST: host,
-  API_GATEWAY_PORT: port,
+  API_GATEWAY_PORT: defaultPort,
   ORIGIN_HOST_1: origin,
   IAM_SERVICE_PORT: iamServicePort,
+  AUDIT_SERVICE_PORT: auditServicePort,
+  AUDIT_HOST: auditHost,
 } = env;
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
 const app = express();
 
-// Trust reverse proxies to get the real client IP (e.g. from Cloudflare, Nginx, or AWS ALB)
-app.set('trust proxy', 'loopback, linklocal, uniquelocal');
+// Trust reverse proxy hops to accurately resolve real client IP on Render and Vercel edge
+app.set('trust proxy', 1);
 
 app.use(requestTracer);
 app.use(sanitizeHeaders);
@@ -79,7 +87,13 @@ app.use(
     origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', HTTP_HEADERS.AUTHORIZATION],
+    allowedHeaders: [
+      'Content-Type',
+      HTTP_HEADERS.AUTHORIZATION,
+      HTTP_HEADERS.CORRELATION_ID,
+      'X-Forwarded-For',
+      'X-Real-IP',
+    ],
     exposedHeaders: [HTTP_HEADERS.CORRELATION_ID],
   })
 );
@@ -89,10 +103,16 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(cookieParser());
 app.use(extractAuthContext);
 
-// General Rate Limiter - 50 request per 15 minutes
-app.use(rateLimiter);
+// Public infrastructure probes (protected by dedicated probe rate limiter: 60 req/min)
+app.get('/', probeRateLimiter, (_req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'api-gateway',
+    timestamp: new Date().toISOString(),
+  });
+});
 
-app.get(GATEWAY_ROUTES.HEALTH, (req, res) => {
+app.get(GATEWAY_ROUTES.HEALTH, probeRateLimiter, (_req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -102,14 +122,17 @@ app.get(GATEWAY_ROUTES.HEALTH, (req, res) => {
 });
 
 // Readiness probe (stateless reverse proxy runtime check)
-app.get(GATEWAY_ROUTES.READY, (req, res) => {
+app.get(GATEWAY_ROUTES.READY, probeRateLimiter, (_req, res) => {
   res.json({ ready: true, uptime: process.uptime() });
 });
 
 // Liveness probe
-app.get(GATEWAY_ROUTES.LIVE, (req, res) => {
+app.get(GATEWAY_ROUTES.LIVE, probeRateLimiter, (_req, res) => {
   res.json({ alive: true });
 });
+
+// General Rate Limiter - 50 requests per 15 minutes (protects all API routes)
+app.use(rateLimiter);
 
 // Version 1 API Router
 const v1Router = express.Router();
@@ -123,6 +146,10 @@ v1Router.use('/auth/change-password', gatewayRequireAuth);
 v1Router.use('/auth/me', gatewayRequireAuth);
 v1Router.use('/auth/sessions', gatewayRequireAuth);
 v1Router.use(GATEWAY_ROUTES.ADMIN, gatewayRequireAuth);
+
+// Mount Audit Service Proxy with Edge Rate Limiting & Auth
+v1Router.use(GATEWAY_ROUTES.AUDIT, auditRateLimiter);
+v1Router.use(GATEWAY_ROUTES.AUDIT, gatewayRequireAuth);
 
 v1Router.use(
   GATEWAY_ROUTES.AUTH,
@@ -150,13 +177,26 @@ v1Router.use(
   })
 );
 
+v1Router.use(
+  GATEWAY_ROUTES.AUDIT,
+  createServiceProxy({
+    serviceName: GATEWAY_PROXY_CONFIG.AUDIT_SERVICE.name,
+    serviceUrl: `${auditHost}:${auditServicePort}`,
+    timeout: GATEWAY_PROXY_CONFIG.AUDIT_SERVICE.timeoutMs,
+    circuitBreaker: GATEWAY_PROXY_CONFIG.AUDIT_SERVICE.circuitBreaker,
+    proxyReqPathResolver: (req) => {
+      return `${GATEWAY_ROUTES.UPSTREAM_AUDIT_PREFIX}${req.url}`;
+    },
+  })
+);
+
 // Mount v1 router
 app.use(GATEWAY_ROUTES.V1_PREFIX, v1Router);
 
 app.use(errorMiddleware);
 
-const server = app.listen(port as number, '0.0.0.0', () => {
-  logger.info(`Listening at ${host}:${port}`);
+const server = app.listen(port, '0.0.0.0', () => {
+  logger.info(`Listening at http://0.0.0.0:${port}`);
 });
 server.on('error', (err) => logger.error(err));
 

@@ -116,6 +116,7 @@ export interface AuthLoginSuccessPayload {
   userId: string;
   sessionId: string;
   email: string;
+  username?: string;
   ipAddress: string;
   userAgent: string;
   deviceFingerprint: string;
@@ -136,6 +137,7 @@ export interface ImpossibleTravelPayload {
   userId: string;
   sessionId: string;
   email: string;
+  username?: string;
   currentCity?: string;
   previousCity?: string;
   velocityKmH: number;
