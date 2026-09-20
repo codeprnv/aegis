@@ -127,8 +127,8 @@ export async function untrustDeviceAction(
  * @param limit - Number of logs to retrieve
  */
 export async function fetchMoreAuditLogsAction(
-  offset: number = 0,
-  limit: number = 20
+  offset = 0,
+  limit = 20
 ) {
   const result = await serverFetch<{
     logs: Array<{
