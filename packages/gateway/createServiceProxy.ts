@@ -1,7 +1,3 @@
-import { id } from 'cls-rtracer';
-import { NextFunction, Request, Response } from 'express';
-import proxy from 'express-http-proxy';
-import CircuitBreaker from 'opossum';
 import {
   AUTH_ROLES,
   SENTINEL_USERS,
@@ -9,6 +5,10 @@ import {
   type InternalTokenPayload,
 } from '@aegis/auth';
 import { HTTP_HEADERS, HTTP_STATUS, logger } from '@aegis/common';
+import { id } from 'cls-rtracer';
+import { NextFunction, Request, Response } from 'express';
+import proxy from 'express-http-proxy';
+import CircuitBreaker from 'opossum';
 import { GATEWAY_ERROR_CODES, PROXY_DEFAULTS } from './constants.js';
 
 interface ServiceProxyOptions {
@@ -51,8 +51,12 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       proxyReqOpts.headers[HTTP_HEADERS.CORRELATION_ID] = String(id() ?? '');
 
       // Propagate the Gateway-resolved real client IP to downstream microservices.
-      // srcReq.ip is validated against trusted proxy CIDR ranges at the edge.
-      const resolvedClientIp = srcReq.ip || srcReq.socket.remoteAddress || '127.0.0.1';
+      // Prioritizes cryptographically verified clientIp (from Vercel edge) before fallback to socket.
+      const resolvedClientIp =
+        srcReq.clientIp ||
+        srcReq.ip ||
+        srcReq.socket?.remoteAddress ||
+        '127.0.0.1';
       proxyReqOpts.headers[HTTP_HEADERS.FORWARDED_FOR] = resolvedClientIp;
       proxyReqOpts.headers[HTTP_HEADERS.REAL_IP] = resolvedClientIp;
 
@@ -64,7 +68,8 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       };
       try {
         const internalToken = generateInternalToken(payload, serviceName);
-        proxyReqOpts.headers[HTTP_HEADERS.AUTHORIZATION] = `Bearer ${internalToken}`;
+        proxyReqOpts.headers[HTTP_HEADERS.AUTHORIZATION] =
+          `Bearer ${internalToken}`;
       } catch (error) {
         logger.error(
           { error, serviceName },

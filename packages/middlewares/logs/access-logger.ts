@@ -19,7 +19,10 @@ export const accessLogger = pinoHttp({
       return {
         method: req.method,
         path: req.originalUrl || req.url,
-        ip: req.ip || req.socket?.remoteAddress,
+        ip:
+          (req as { clientIp?: string }).clientIp ||
+          req.ip ||
+          req.socket?.remoteAddress,
         userAgent: req.headers['user-agent'],
       };
     },

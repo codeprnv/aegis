@@ -11,6 +11,7 @@ export const HTTP_HEADERS = {
   VERCEL_FORWARDED_FOR: 'x-vercel-forwarded-for',
   VERCEL_IP: 'x-vercel-ip',
   CF_CONNECTING_IP: 'cf-connecting-ip',
+  AEGIS_SIGNATURE: 'x-aegis-signature',
   DEVICE_FINGERPRINT: 'x-device-fingerprint',
   DEVICE_INSTANCE_ID: 'x-device-instance-id',
   SESSION_ID: 'x-session-id',
@@ -37,4 +38,5 @@ export const SENSITIVE_HEADERS = [
   HTTP_HEADERS.INTERNAL_TOKEN,
   HTTP_HEADERS.CORRELATION_ID,
   HTTP_HEADERS.AUTH_CONTEXT,
+  HTTP_HEADERS.AEGIS_SIGNATURE,
 ] as const;

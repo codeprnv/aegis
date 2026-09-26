@@ -52,3 +52,5 @@ services:
         sync: false
       - key: RESEND_FROM_EMAIL
         value: Aegis Security <noreply@codeprnv.org>
+      - key: EDGE_INGRESS_SECRET
+        sync: false

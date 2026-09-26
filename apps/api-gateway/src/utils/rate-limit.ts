@@ -16,16 +16,10 @@ const redisClient = new RedisClient(
  * @returns Sanitized client IP address string
  */
 export function extractClientIp(req: Request): string {
-  const xForwardedFor = req.headers['x-forwarded-for'];
-  if (typeof xForwardedFor === 'string' && xForwardedFor.length > 0) {
-    const firstIp = xForwardedFor.split(',')[0].trim();
-    if (firstIp) return firstIp;
+  if (req.clientIp) {
+    return req.clientIp;
   }
-  const xRealIp = req.headers['x-real-ip'];
-  if (typeof xRealIp === 'string' && xRealIp.trim().length > 0) {
-    return xRealIp.trim();
-  }
-  return req.ip || req.socket.remoteAddress || '127.0.0.1';
+  return req.ip || req.socket?.remoteAddress || '127.0.0.1';
 }
 
 export const rateLimiter = rateLimit({

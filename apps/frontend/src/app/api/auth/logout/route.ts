@@ -1,3 +1,4 @@
+import { getClientTelemetryHeaders } from '@/lib/request-context';
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = `${process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080'}/v1`;
@@ -12,6 +13,7 @@ const API_BASE_URL = `${process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080'}/
 export async function GET(request: NextRequest) {
   const cookieHeader = request.headers.get('cookie') || '';
   const correlationId = request.headers.get('x-correlation-id') || crypto.randomUUID();
+  const telemetryHeaders = await getClientTelemetryHeaders();
 
   try {
     if (cookieHeader) {
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'application/json',
           'X-Correlation-ID': correlationId,
           Cookie: cookieHeader,
+          ...telemetryHeaders,
         },
         cache: 'no-store',
       });
@@ -36,4 +39,6 @@ export async function GET(request: NextRequest) {
 
   return response;
 }
+
+export const POST = GET;
 

@@ -1,10 +1,11 @@
 process.env.SERVICE_NAME = 'api-gateway';
 
+import crypto from 'node:crypto';
+import net from 'node:net';
+import path from 'path';
 import { apiGatewayEnvSchema } from '@aegis/types';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
-
-import path from 'path';
 
 dotenv.config({
   path: path.resolve(process.cwd(), '.env'),
@@ -47,6 +48,7 @@ const {
   IAM_SERVICE_PORT: iamServicePort,
   AUDIT_SERVICE_PORT: auditServicePort,
   AUDIT_HOST: auditHost,
+  EDGE_INGRESS_SECRET: edgeIngressSecret,
 } = env;
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
 const app = express();
@@ -56,6 +58,82 @@ const app = express();
 app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
 app.use(requestTracer);
+
+/**
+ * Hardened Edge Telemetry Verification Middleware.
+ * Cryptographically verifies that incoming client IP headers originated from the
+ * authenticated Vercel BFF, defending against DoS attacks, replay attacks, and timing side-channels.
+ */
+app.use((req, _res, next) => {
+  try {
+    const edgeSecret = edgeIngressSecret || process.env.EDGE_INGRESS_SECRET;
+    if (!edgeSecret) {
+      return next();
+    }
+
+    const rawSignature = req.headers[HTTP_HEADERS.AEGIS_SIGNATURE];
+    const signatureHeader = Array.isArray(rawSignature)
+      ? rawSignature[0]
+      : rawSignature;
+
+    const rawRealIp = req.headers[HTTP_HEADERS.REAL_IP];
+    const realIpHeader = Array.isArray(rawRealIp) ? rawRealIp[0] : rawRealIp;
+
+    if (
+      typeof signatureHeader !== 'string' ||
+      typeof realIpHeader !== 'string' ||
+      signatureHeader.length === 0 ||
+      signatureHeader.length > 256 ||
+      realIpHeader.length === 0 ||
+      realIpHeader.length > 64
+    ) {
+      return next();
+    }
+
+    const dotIndex = signatureHeader.indexOf('.');
+    if (dotIndex <= 0) {
+      return next();
+    }
+
+    const timestampStr = signatureHeader.substring(0, dotIndex);
+    const receivedSig = signatureHeader.substring(dotIndex + 1);
+    const timestamp = parseInt(timestampStr, 10);
+
+    if (Number.isNaN(timestamp) || Math.abs(Date.now() - timestamp) > 60000) {
+      return next();
+    }
+
+    if (receivedSig.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(receivedSig)) {
+      return next();
+    }
+
+    const trimmedRealIp = realIpHeader.trim();
+    if (net.isIP(trimmedRealIp) === 0) {
+      return next();
+    }
+
+    const expectedSig = crypto
+      .createHmac('sha256', edgeSecret)
+      .update(`${trimmedRealIp}:${timestampStr}`)
+      .digest('hex');
+
+    const receivedBuf = Buffer.from(receivedSig, 'hex');
+    const expectedBuf = Buffer.from(expectedSig, 'hex');
+
+    if (
+      receivedBuf.byteLength === 32 &&
+      expectedBuf.byteLength === 32 &&
+      crypto.timingSafeEqual(receivedBuf, expectedBuf)
+    ) {
+      req.clientIp = trimmedRealIp;
+    }
+  } catch (err) {
+    logger.error({ err }, 'Edge telemetry verification error');
+  }
+
+  next();
+});
+
 app.use(sanitizeHeaders);
 app.use(accessLogger);
 app.use(
@@ -94,6 +172,7 @@ app.use(
       HTTP_HEADERS.CORRELATION_ID,
       'X-Forwarded-For',
       'X-Real-IP',
+      HTTP_HEADERS.AEGIS_SIGNATURE,
     ],
     exposedHeaders: [HTTP_HEADERS.CORRELATION_ID],
   })

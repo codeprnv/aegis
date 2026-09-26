@@ -31,6 +31,7 @@ export const apiGatewayEnvSchema = z.object({
   IAM_SERVICE_PORT: z.coerce.number<number>().default(6000),
   AUDIT_SERVICE_PORT: z.coerce.number<number>().default(6004),
   AUDIT_HOST: z.coerce.string<string>().default('http://localhost'),
+  EDGE_INGRESS_SECRET: z.coerce.string<string>().optional(),
 });
 
 export const iamServiceEnvSchema = downstreamServiceBase.extend({
