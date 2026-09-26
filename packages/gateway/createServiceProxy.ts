@@ -50,6 +50,12 @@ export const createServiceProxy = (options: ServiceProxyOptions) => {
       }
       proxyReqOpts.headers[HTTP_HEADERS.CORRELATION_ID] = String(id() ?? '');
 
+      // Propagate the Gateway-resolved real client IP to downstream microservices.
+      // srcReq.ip is validated against trusted proxy CIDR ranges at the edge.
+      const resolvedClientIp = srcReq.ip || srcReq.socket.remoteAddress || '127.0.0.1';
+      proxyReqOpts.headers[HTTP_HEADERS.FORWARDED_FOR] = resolvedClientIp;
+      proxyReqOpts.headers[HTTP_HEADERS.REAL_IP] = resolvedClientIp;
+
       // Generate the internal token with user context (including active sessionId)
       const payload: Omit<InternalTokenPayload, 'aud'> = {
         sub: srcReq.auth?.id || SENTINEL_USERS.ANONYMOUS,

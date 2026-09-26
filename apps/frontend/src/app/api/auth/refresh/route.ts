@@ -1,5 +1,8 @@
 import { propagateCookies } from '@/lib/cookie-utils';
-import { getCorrelationId } from '@/lib/request-context';
+import {
+  getClientTelemetryHeaders,
+  getCorrelationId,
+} from '@/lib/request-context';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -18,6 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const correlationId = await getCorrelationId();
+  const telemetryHeaders = await getClientTelemetryHeaders();
 
   try {
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -26,6 +30,7 @@ export async function GET(request: NextRequest) {
         'Content-Type': 'application/json',
         'X-Correlation-ID': correlationId,
         Cookie: `refresh_token=${refreshToken}`,
+        ...telemetryHeaders,
       },
       cache: 'no-store',
     });

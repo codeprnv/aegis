@@ -51,8 +51,9 @@ const {
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
 const app = express();
 
-// Trust reverse proxy hops to accurately resolve real client IP on Render and Vercel edge
-app.set('trust proxy', 1);
+// Trust private/loopback/linklocal upstream proxies (Render router, Docker bridge, localhost).
+// Express strips all private proxy IPs from X-Forwarded-For and selects the first public routable IP.
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
 app.use(requestTracer);
 app.use(sanitizeHeaders);

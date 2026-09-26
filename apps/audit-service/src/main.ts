@@ -17,6 +17,9 @@ import { startAnomalyWorker } from './workers/anomaly.worker.js';
 const app = express();
 const port = auditServerConfig.port;
 
+// Trust the co-located API Gateway on loopback (1 hop) to read the canonical client IP
+app.set('trust proxy', 1);
+
 app.use(requestTracer);
 app.use(accessLogger);
 app.use(express.json());

@@ -6,10 +6,13 @@
 // ============================================================
 
 
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { buildCookieHeader } from './cookie-utils';
-import { getCorrelationId } from './request-context';
+import {
+  getClientTelemetryHeaders,
+  getCorrelationId,
+} from './request-context';
 
 const API_BASE_URL = `${process.env.API_GATEWAY_URL || 'http://127.0.0.1:8080'}/v1`;
 
@@ -18,45 +21,6 @@ export interface ServerFetchResult<T = unknown> {
   data?: T;
   error?: string;
   status: number;
-}
-
-/**
- * Extracts and sanitizes client telemetry and IP information from the incoming request.
- * Prioritizes trusted proxy headers before falling back to X-Forwarded-For or localhost.
- */
-async function getClientTelemetryHeaders(): Promise<Record<string, string>> {
-  try {
-    const incomingHeaders = await headers();
-    const rawForwardedFor = incomingHeaders.get('x-forwarded-for');
-    const realIp =
-      incomingHeaders.get('cf-connecting-ip') ||
-      incomingHeaders.get('x-real-ip') ||
-      (rawForwardedFor ? rawForwardedFor.split(',')[0].trim() : '127.0.0.1');
-
-    const telemetryHeaders: Record<string, string> = {
-      'X-Forwarded-For': realIp,
-      'X-Real-IP': realIp,
-    };
-
-    const userAgent = incomingHeaders.get('user-agent');
-    if (userAgent) telemetryHeaders['User-Agent'] = userAgent;
-
-    const acceptLanguage = incomingHeaders.get('accept-language');
-    if (acceptLanguage) telemetryHeaders['Accept-Language'] = acceptLanguage;
-
-    const secChUa = incomingHeaders.get('sec-ch-ua');
-    if (secChUa) telemetryHeaders['Sec-CH-UA'] = secChUa;
-
-    const secChUaPlatform = incomingHeaders.get('sec-ch-ua-platform');
-    if (secChUaPlatform) telemetryHeaders['Sec-CH-UA-Platform'] = secChUaPlatform;
-
-    return telemetryHeaders;
-  } catch {
-    return {
-      'X-Forwarded-For': '127.0.0.1',
-      'X-Real-IP': '127.0.0.1',
-    };
-  }
 }
 
 export async function serverFetch<T = unknown>(

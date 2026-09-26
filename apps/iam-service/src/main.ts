@@ -32,7 +32,7 @@ const port = env.IAM_SERVICE_PORT;
 const host = env.HOST;
 const app = express();
 
-// Trust the API Gateway proxy to get the real client IP
+// Trust the co-located API Gateway on loopback (1 hop) to read the canonical client IP
 app.set('trust proxy', 1);
 
 app.use(cookieParser()); // Parse cookies for refresh token reads
