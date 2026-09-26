@@ -47,7 +47,7 @@ export function middleware(request: NextRequest) {
   );
 
   if (isProtectedRoute && !hasSession) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/login', request.nextUrl);
     loginUrl.searchParams.set('callbackUrl', pathname);
     const response = NextResponse.redirect(loginUrl);
     response.headers.set('x-correlation-id', correlationId);
@@ -57,7 +57,7 @@ export function middleware(request: NextRequest) {
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route));
 
   if (isAuthRoute && hasSession) {
-    const response = NextResponse.redirect(new URL('/dashboard', request.url));
+    const response = NextResponse.redirect(new URL('/dashboard', request.nextUrl));
     response.headers.set('x-correlation-id', correlationId);
     return response;
   }

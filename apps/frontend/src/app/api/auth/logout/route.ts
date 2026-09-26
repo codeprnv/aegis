@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Graceful fallback to proceed with local cookie clearance if backend is unavailable
   }
 
-  const response = NextResponse.redirect(new URL('/login', request.url), 303);
+  const response = NextResponse.redirect(new URL('/login', request.nextUrl), 303);
 
   response.cookies.delete('access_token');
   response.cookies.delete('refresh_token');

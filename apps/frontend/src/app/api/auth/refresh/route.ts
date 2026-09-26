@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   // If there's no refresh token, we can't refresh. Send to logout to clear any stale state.
   if (!refreshToken) {
-    return NextResponse.redirect(new URL('/api/auth/logout', request.url), 303);
+    return NextResponse.redirect(new URL('/api/auth/logout', request.nextUrl), 303);
   }
 
   const correlationId = await getCorrelationId();
@@ -41,16 +41,16 @@ export async function GET(request: NextRequest) {
       await propagateCookies(response);
 
       // Redirect the user back to their original page
-      return NextResponse.redirect(new URL(callbackUrl, request.url), 303);
+      return NextResponse.redirect(new URL(callbackUrl, request.nextUrl), 303);
     } else {
       // Refresh token is invalid or expired
       return NextResponse.redirect(
-        new URL('/api/auth/logout', request.url),
+        new URL('/api/auth/logout', request.nextUrl),
         303
       );
     }
   } catch (error) {
     // Backend is down, etc. Don't clear cookies yet, just show login.
-    return NextResponse.redirect(new URL('/login', request.url), 303);
+    return NextResponse.redirect(new URL('/login', request.nextUrl), 303);
   }
 }
