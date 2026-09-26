@@ -53,13 +53,14 @@ export async function getClientTelemetryHeaders(): Promise<Record<string, string
 
     // 3. Cryptographic Edge Ingress Signature (HMAC-SHA256)
     const edgeSecret = process.env.EDGE_INGRESS_SECRET;
-    if (edgeSecret && realIp && realIp !== '127.0.0.1') {
+    if (edgeSecret && realIp) {
       const timestamp = Date.now().toString();
       const hmac = crypto
         .createHmac('sha256', edgeSecret)
         .update(`${realIp}:${timestamp}`)
         .digest('hex');
 
+      telemetryHeaders['X-Aegis-Client-IP'] = realIp;
       telemetryHeaders['X-Aegis-Signature'] = `${timestamp}.${hmac}`;
     }
 

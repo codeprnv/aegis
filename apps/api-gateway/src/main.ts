@@ -76,7 +76,9 @@ app.use((req, _res, next) => {
       ? rawSignature[0]
       : rawSignature;
 
-    const rawRealIp = req.headers[HTTP_HEADERS.REAL_IP];
+    const rawRealIp =
+      req.headers[HTTP_HEADERS.AEGIS_CLIENT_IP] ||
+      req.headers[HTTP_HEADERS.REAL_IP];
     const realIpHeader = Array.isArray(rawRealIp) ? rawRealIp[0] : rawRealIp;
 
     if (
@@ -126,6 +128,15 @@ app.use((req, _res, next) => {
       crypto.timingSafeEqual(receivedBuf, expectedBuf)
     ) {
       req.clientIp = trimmedRealIp;
+      logger.info(
+        { clientIp: req.clientIp, socketIp: req.ip },
+        'Edge telemetry: verified client IP'
+      );
+    } else {
+      logger.warn(
+        { claimedIp: trimmedRealIp, socketIp: req.ip },
+        'Edge telemetry: signature mismatch'
+      );
     }
   } catch (err) {
     logger.error({ err }, 'Edge telemetry verification error');
@@ -173,6 +184,7 @@ app.use(
       'X-Forwarded-For',
       'X-Real-IP',
       HTTP_HEADERS.AEGIS_SIGNATURE,
+      HTTP_HEADERS.AEGIS_CLIENT_IP,
     ],
     exposedHeaders: [HTTP_HEADERS.CORRELATION_ID],
   })
